@@ -1,0 +1,160 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!-- 
+    Microsoft ResX Schema 
+    
+    Version 2.0
+    
+    The primary goals of this format is to allow a simple XML format 
+    that is mostly human readable. The generation and parsing of the 
+    various data types are done through the TypeConverter classes 
+    associated with the data types.
+    
+    Example:
+    
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+                
+    There are any number of "resheader" rows that contain simple 
+    name/value pairs.
+    
+    Each data row contains a name, and value. The row also contains a 
+    type or mimetype. Type corresponds to a .NET class that support 
+    text/value conversion through the TypeConverter architecture. 
+    Classes that don't support this are serialized and stored with the 
+    mimetype set.
+    
+    The mimetype is used for serialized objects, and tells the 
+    ResXResourceReader how to depersist the object. This is currently not 
+    extensible. For a given mimetype the value must be set accordingly:
+    
+    Note - application/x-microsoft.net.object.binary.base64 is the format 
+    that the ResXResourceWriter will generate, however the reader can 
+    read any of the formats listed below.
+    
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+    
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array 
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <metadata name="storChartCustsjobBindingSource.TrayLocation" type="System.Drawing.Point, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
+    <value>107, 17</value>
+  </metadata>
+  <metadata name="cmsDB.TrayLocation" type="System.Drawing.Point, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
+    <value>349, 17</value>
+  </metadata>
+  <data name="chartResult.PropBag" xml:space="preserve">
+    <value>&lt;?xml version="1.0"?&gt;&lt;Chart2DPropBag Version="4.0.20113.21313"&gt;&lt;StyleCollection&gt;&lt;NamedStyle Name="Legend" ParentName="Legend.default" StyleData="AlignHorz=Center;AlignVert=Top;" /&gt;&lt;NamedStyle Name="Control" ParentName="Control.default" StyleData="BackColor=LightSlateGray;Border=Solid,ControlDark,1;ForeColor=ControlText;" /&gt;&lt;NamedStyle Name="Header" ParentName="Control" StyleData="Border=None,Transparent,1;" /&gt;&lt;NamedStyle Name="Legend.default" ParentName="Control" StyleData="AlignVert=Top;Border=None,Transparent,1;Wrap=False;" /&gt;&lt;NamedStyle Name="Area.default" ParentName="Control" StyleData="AlignVert=Top;Border=None,Transparent,1;" /&gt;&lt;NamedStyle Name="AxisY2" ParentName="Area" StyleData="AlignHorz=Far;AlignVert=Center;Rotation=Rotate90;" /&gt;&lt;NamedStyle Name="Footer" ParentName="Control" StyleData="Border=None,Transparent,1;" /&gt;&lt;NamedStyle Name="Control.default" ParentName="" StyleData="BackColor=Control;Border=None,Transparent,1;ForeColor=ControlText;" /&gt;&lt;NamedStyle Name="LabelStyleDefault" ParentName="LabelStyleDefault.default" /&gt;&lt;NamedStyle Name="LabelStyleDefault.default" ParentName="Control" StyleData="BackColor=Transparent;Border=None,Transparent,1;" /&gt;&lt;NamedStyle Name="PlotArea" ParentName="Area" StyleData="BackColor=Window;BackColor2=;Border=None,Transparent,1;GradientStyle=None;HatchStyle=None;Opaque=True;" /&gt;&lt;NamedStyle Name="Area" ParentName="Area.default" StyleData="BackColor=Window;Border=Solid,ControlDark,1;Rounding=10 10 10 10;" /&gt;&lt;NamedStyle Name="AxisY" ParentName="Area" StyleData="AlignHorz=Near;AlignVert=Center;Font=Microsoft Sans Serif, 8.25pt;ForeColor=ControlDarkDark;Rotation=Rotate270;" /&gt;&lt;NamedStyle Name="AxisX" ParentName="Area" StyleData="AlignHorz=Center;AlignVert=Bottom;Font=Microsoft Sans Serif, 8.25pt;ForeColor=ControlDarkDark;Rotation=Rotate0;" /&gt;&lt;/StyleCollection&gt;&lt;ChartGroupsCollection&gt;&lt;ChartGroup Name="Group1" ChartType="Bar" Use3D="False"&gt;&lt;DataSerializer DefaultSet="True"&gt;&lt;DataSeriesCollection&gt;&lt;DataSeriesSerializer&gt;&lt;LineStyle Color="RoyalBlue" /&gt;&lt;SymbolStyle Color="LightPink" OutlineColor="DeepPink" Shape="Box" /&gt;&lt;SeriesLabel&gt;数量&lt;/SeriesLabel&gt;&lt;DataTypes&gt;Int32;Int32;Double;Double;Double&lt;/DataTypes&gt;&lt;DataFields&gt;customerjobkind;totalcount;;;&lt;/DataFields&gt;&lt;FillStyle /&gt;&lt;Histogram /&gt;&lt;/DataSeriesSerializer&gt;&lt;/DataSeriesCollection&gt;&lt;Highlight /&gt;&lt;/DataSerializer&gt;&lt;/ChartGroup&gt;&lt;ChartGroup Name="Group2"&gt;&lt;DataSerializer&gt;&lt;Highlight /&gt;&lt;/DataSerializer&gt;&lt;/ChartGroup&gt;&lt;/ChartGroupsCollection&gt;&lt;Header Compass="North" Visible="False"&gt;&lt;Text&gt;Header&lt;/Text&gt;&lt;/Header&gt;&lt;Footer Compass="South" Visible="False" /&gt;&lt;Legend Compass="East" Visible="True" /&gt;&lt;ChartArea LocationDefault="-1, -1" SizeDefault="-1, -1" PlotLocation="-1, -1" PlotSize="-1, -1"&gt;&lt;Margin /&gt;&lt;/ChartArea&gt;&lt;Axes&gt;&lt;Axis Max="1.05" Min="-0.05" UnitMajor="0.1" UnitMinor="0.05" AutoMajor="True" AutoMinor="True" AutoMax="True" AutoMin="True" AnnoMethod="ValueLabels" _onTop="-1" Compass="South"&gt;&lt;GridMajor Visible="True" Spacing="0.1" /&gt;&lt;/Axis&gt;&lt;Axis Max="1" Min="0" UnitMajor="0.1" UnitMinor="0.05" AutoMajor="True" AutoMinor="True" AutoMax="True" AutoMin="True" _onTop="-1" Compass="West"&gt;&lt;GridMajor Visible="True" Spacing="0.1" /&gt;&lt;/Axis&gt;&lt;Axis Max="0" Min="0" UnitMajor="0" UnitMinor="0" AutoMajor="True" AutoMinor="True" AutoMax="True" AutoMin="True" Compass="East" /&gt;&lt;/Axes&gt;&lt;AutoLabelArrangement /&gt;&lt;VisualEffectsData&gt;45,1,0.6,0.1,0.5,0.9,0,0,0.15,0,0,1,0.5,-25,0,0,0,1,64,1;Group1=45,1,0.6,0.1,0.5,0.9,0,0,0.15,0,0,1,0.5,-25,0,0,0,1,64,1;Group0=45,1,0.6,0.1,0.5,0.9,0,0,0.15,0,0,1,0.5,-25,0,0,0,1,64,1&lt;/VisualEffectsData&gt;&lt;/Chart2DPropBag&gt;</value>
+  </data>
+  <metadata name="pdfDoc.TrayLocation" type="System.Drawing.Point, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
+    <value>17, 17</value>
+  </metadata>
+  <metadata name="storChartSalecustsjobTableAdapter.TrayLocation" type="System.Drawing.Point, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
+    <value>438, 17</value>
+  </metadata>
+  <assembly alias="System.Drawing" name="System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" />
+  <data name="$this.Icon" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+    <value>
+        AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAgCUAAAAAAAAAAAAAAAAAAAAA
+        AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD4/P4Dkc/5dYCx9IHi5OYwAAAAAAAA
+        AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADV7fwoX7n2xUCq9f8heO3/mZ6o/VeK
+        6a5TVl0CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPf7/gOY0vlzP6Py9SR97v88pPT/IXru/5me
+        p/8oa+XwTlNcBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM7o/ChZtfbEP6v1/zqZ8P83lfD/RK71/yF8
+        7v+Zn6j/KG3m8E5TXAQAAAAAAAAAAAAAAAAAAAAA+Pv+BIrF9nk1ofT4Oab1/z6q9f9DrvX/RrH1/0Sv
+        9f8gfu//mZ+o/yhv5vBOU1wEAAAAAAAAAAAAAAAA1Ob5K0qi88gpl/X/NKH1/zil9f89qfX/Qq71/0ax
+        9f9Er/X/IH/w/5mfp/8ocefwTlNcBAAAAAAAAAAAUlZbGyuO8/YijvT/KJb0/zKg9f83pPX/Pan1/0Gt
+        9f9FsPX/RK/1/yCB8f+Zn6j/KHPo8E5TXAQAAAAAAAAAAExSWCQjifP/Io70/ymW9P8xn/X/NqT0/zyo
+        9f9BrPX/RbD1/0Sv9f8fg/H/mZ+o/yd06PBOU1wEAAAAAAAAAABNU1kkIojz/yOP9P8pl/T/MJ71/zWj
+        9f87p/X/QKz1/0Sv9f9Ptvb/L5Hz/5mfqP8ndunwTlNcBAAAAAAAAAAATlRaJCOJ8/8jkPT/KJb1/y+c
+        9f80ovX/Oqf1/0Gs9f9nxPb/jdv1/6LK2P+zw8n/RZnv7U9VXQQAAAAAAAAAAExUWxIgiPP7Io/0/yaV
+        9f8tm/X/NKH1/0iv9f+F1fj/mNbo/7jIzf+r0+D/kN/309fz/DcAAAAAAAAAAAAAAABNVV0OH4fz+iGO
+        9P8mlPX/LZv1/2W+9/+c4Pf/m8zN/3HAiv9/xsL7sOj6h/b8/ggAAAAAAAAAAAAAAAAAAAAATVVdDh+H
+        8/ohjfT/OJ/1/43U+f+p3Oz/r8fE/3HBg/9tx4HW2/T8OAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAE1V
+        XQ4hh/P6YrP2/63j9/+Syrn/m8Kk/3nLlfye27SR8vr1CwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+        AABUWV0JntT51brh7f68ysv/lNS7/53dzdbX8OFBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+        AAAAAAAAAAAAAP3+/gLo6epSy+fwqMfv/Iz4/f4JAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+        AAAAAAAA/4cAAP8BAAD8AQAA+AEAAOABAADAAQAAgAEAAIABAACAAQAAgAEAAIADAACABwAAgB8AAIA/
+        AACA/wAAwf8AAA==
+</value>
+  </data>
+</root>

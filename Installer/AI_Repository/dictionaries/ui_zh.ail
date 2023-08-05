@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<DICTIONARY type="singlelanguage" lang="zh" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="dictionary.xsd">
+  <STRING id="Metro.Control.Text.WelcomeDlg#YouMustAgreeCtrl" value="&lt;a href=&quot;&quot;&gt;您必须接受&lt;a href=&quot;&quot;&gt;许可条款和条件&lt;/a&gt;之前，你可以安装应用[ProductName]。"/>
+</DICTIONARY>
