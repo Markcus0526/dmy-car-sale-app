@@ -1,0 +1,91 @@
+[
+  {
+    "key": "common.你删除第00项",
+    "value": "你删除第{0:0}项？",
+    "placeholders": [
+      "{0:0}"
+    ],
+    "source": "FrmAppendRepairEdit.cs:179"
+  },
+  {
+    "key": "carCompanyEdit.00的进货单位代码空了",
+    "value": "{0:0}的进货单位代码空了。",
+    "placeholders": [
+      "{0:0}"
+    ],
+    "source": "FrmCarCompanyEdit.cs:122"
+  },
+  {
+    "key": "carCompanyEdit.00的进货单位名称空了",
+    "value": "{0:0}的进货单位名称空了。",
+    "placeholders": [
+      "{0:0}"
+    ],
+    "source": "FrmCarCompanyEdit.cs:129"
+  },
+  {
+    "key": "carCompanyEdit.00的进货单位代码已经在",
+    "value": "{0:0}的进货单位代码已经在了。",
+    "placeholders": [
+      "{0:0}"
+    ],
+    "source": "FrmCarCompanyEdit.cs:136"
+  },
+  {
+    "key": "carTypeEdit.00的大类型空了",
+    "value": "{0:0}的大类型空了。",
+    "placeholders": [
+      "{0:0}"
+    ],
+    "source": "FrmCarTypeEdit.cs:122"
+  },
+  {
+    "key": "carTypeEdit.00的车辆代码空了",
+    "value": "{0:0}的车辆代码空了。",
+    "placeholders": [
+      "{0:0}"
+    ],
+    "source": "FrmCarTypeEdit.cs:129"
+  },
+  {
+    "key": "carTypeEdit.00的车辆名称空了",
+    "value": "{0:0}的车辆名称空了。",
+    "placeholders": [
+      "{0:0}"
+    ],
+    "source": "FrmCarTypeEdit.cs:136"
+  },
+  {
+    "key": "onRoadCarEdit.00的VIN码价重复了",
+    "value": "{0:0}的VIN码价重复了!.",
+    "placeholders": [
+      "{0:0}"
+    ],
+    "source": "FrmOnRoadCarEdit.cs:166"
+  },
+  {
+    "key": "reportCarseriesTotal.Cells",
+    "value": "{0}年 {1}月",
+    "placeholders": [
+      "{0}",
+      "{1}"
+    ],
+    "source": "FrmReportCarseriesTotal.cs:89"
+  },
+  {
+    "key": "common.00的入库单号价空了",
+    "value": "{0:0}的入库单号价空了!.",
+    "placeholders": [
+      "{0:0}"
+    ],
+    "source": "FrmStoreInAdd.cs:160"
+  },
+  {
+    "key": "userPermissionEdit.00的名称已经在了",
+    "value": "{0:0}的名称已经在了。",
+    "placeholders": [
+      "{0:0}"
+    ],
+    "source": "FrmUserPermissionEdit.cs:114"
+  }
+]
