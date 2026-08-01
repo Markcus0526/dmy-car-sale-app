@@ -10,14 +10,14 @@ Newest entry first.
 
 ## Where things stand
 
-*Updated end of Day 6. Read this first; the entries below are the detail.*
+*Updated end of Day 7. Read this first; the entries below are the detail.*
 
 | | |
 |---|---|
 | **Phase** | Phase 1 (foundation) in progress. **Phase 0 not yet run** |
-| **Sessions logged** | 7 (Day 0–6) |
-| **Plan** | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — 161 sessions, 14 locked decisions |
-| **Next action** | Plan days 6–7: draft `migrations/0001_init.up.sql` skeleton from `docs/mysql/schema.sql`, marking every field Phase 0 must confirm |
+| **Sessions logged** | 8 (Day 0–7) |
+| **Plan** | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — 161 sessions, 16 locked decisions |
+| **Next action** | **Phase 1 is now blocked on Phase 0.** Plan day 8–11 (`cmd/migrate-data`) needs the reconciled schema and a live MSSQL to read from. Run the export |
 
 **Green — verified and repeatable**
 
@@ -30,6 +30,8 @@ Newest entry first.
 - English catalogue: **472/472** translated, `verify.mjs` exit=0 on both catalogues.
 - Encoding conversion lossless: 201 files, 5,435 CJK codepoints, 0 failures.
   `node tools/convert-encoding/convert.mjs` (add `--check` to verify only).
+- **Migrations apply to real MySQL 8.4** — 15 tables, 206 columns, 5 FKs, down leaves 0,
+  re-apply works. `row_version` blocks stale writes; utf8mb4 stores 4-byte chars intact.
 - 49 permission keys match legacy `FrmMDIMain` exactly.
 - **CI** (`.github/workflows/ci.yml`) — 3 jobs, all 9 steps verified locally.
 
@@ -85,6 +87,103 @@ Newest entry first.
 **Next action**
 -
 ```
+
+---
+
+## Day 7 — 2026-08-01 — Initial migrations (plan days 6–7)
+
+**Done**
+
+- `tools/gen-migration/gen.mjs` — generates the migrations from
+  `docs/mysql/schema.sql`. Generated rather than hand-copied: 15 tables of DDL
+  transcribed by hand reliably produces silent column-type errors, and a wrong
+  `DECIMAL` scale is not something a later test would catch.
+- Four files: `0001_init.{up,down}.sql`, `0002_foreign_keys.{up,down}.sql`.
+- **Applied and exercised against real MySQL 8.4** in Docker.
+- CI gains a `migrations` job with a MySQL service container (plan day 13's remaining item).
+
+**Two decisions locked — both change every table**
+
+**D15 — optimistic concurrency: `row_version INT UNSIGNED NOT NULL DEFAULT 1`**
+
+Legacy compared every original column plus `@IsNull_*` flags on each UPDATE/DELETE (§2.5);
+a naive `WHERE uid = ?` would turn today's concurrency violations into silent overwrites
+(§11.4).
+
+- *Rejected `updated_at`*: two updates inside one clock tick are indistinguishable, and
+  clock skew across app instances makes it worse. A counter has neither problem.
+- *Rejected whole-row comparison*: fragile around NULL handling and DECIMAL equality, and
+  produces enormous WHERE clauses for no gain over a counter.
+- *Deliberately did NOT add `created_at`/`updated_at`*: there is no source data for them,
+  so every migrated row would claim to have been created at migration time. Fabricated
+  timestamps in a financial system are worse than absent ones.
+
+**D16 — collation: storage stays `utf8mb4_unicode_ci`; display order in Go via
+`x/text/collate`**
+
+Legacy sorts under `Chinese_PRC_CI_AS` (pinyin). MySQL's closest analogue,
+`utf8mb4_zh_0900_as_cs`, is accent- **and case-sensitive** — which would silently change
+equality semantics for permission values (`读写`) and the `是否*` columns the app compares
+by value. **Changing sort order is a display bug; changing equality is a correctness bug.**
+So: keep case-insensitive equality, sort for display in the application.
+`ORDER BY carseries` in SQL is *not* authoritative for display order.
+
+**Foreign keys deliberately split into 0002**
+
+§5.3 requires validating for orphans *before* adding constraints, and that cannot happen
+until `cmd/migrate-data` has run. A single migration that fails halfway through adding
+constraints leaves a half-constrained schema. Load → verify → constrain.
+
+**Verified against MySQL 8.4.11 (not just "it parses")**
+
+```
+0001 up        15 tables, 206 columns (191 source + 15 row_version)
+0002 up        5 FKs, including the implied tbl_storechange.onroadid
+collation      utf8mb4_unicode_ci on every table
+0001 down      0 tables left
+re-apply       clean
+generator      191/191 source columns preserved, exactly 1 row_version per table
+```
+
+Behavioural, not structural:
+
+- fresh update with the correct `row_version` → 1 row affected
+- **stale update with a held version → 0 rows** — the lost write is prevented, and the
+  handler turns that into `409 Conflict`
+- FK rejects an orphan: `ERROR 1452 … fk_tbl_permission_userinfoid`
+- utf8mb4: `测试𠮷` → `chars=3 bytes=10 hex=E6B58BE8AF95F0A0AEB7`
+
+**A near-miss worth recording**
+
+The first utf8mb4 check reported `CHAR_LENGTH = 10` instead of 3, which reads exactly like
+broken 4-byte storage. It was not: nested shell quoting had lost the client charset. Re-run
+via stdin with `--default-character-set=utf8mb4`, it was correct.
+
+The lesson is not about the test. **`cmd/migrate-data` must set the connection charset
+explicitly** — a client that negotiates a narrower charset mangles 4-byte characters on the
+way in, silently, with no error. That is a data-corruption bug that would surface months
+later in a report. Written into the CI job as a comment so it is not re-learned.
+
+**CI note**
+
+The behavioural step originally printed `FAIL` without failing the build — a test that
+cannot fail. Rewritten to grep the output and exit non-zero, and validated with a negative
+control (an injected `FAIL` line is caught).
+
+**Blocked — and Phase 1 has now run out of unblocked work**
+
+- **Phase 0 day 1** — export against `csm` on `R-SEVEN64`.
+
+Everything remaining in Phase 1 depends on it: day 8–11 (`cmd/migrate-data`) needs both the
+reconciled schema *and* a live MSSQL to read from; the `TODO(phase0)` markers in
+`0001_init.up.sql` (defaults, indexes, checks, collation) cannot be resolved without the
+dump. Non-PK indexes are the most consequential of those — each one is a query the old
+system relied on, and rediscovering them under production load is the expensive route.
+
+**Next action**
+
+Run the export. Gate: **28 proc files, 5 view files**. Then re-run
+`node tools/gen-migration/gen.mjs` against the reconciled `schema.sql`.
 
 ---
 

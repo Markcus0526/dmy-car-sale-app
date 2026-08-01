@@ -52,6 +52,77 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
 
+  migrations:
+    name: Migrations
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: test
+          MYSQL_DATABASE: csm
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="mysqladmin ping -uroot -ptest --silent"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+
+      # --default-character-set=utf8mb4 is not optional. Without it the client
+      # connection can negotiate a narrower charset and 4-byte characters are
+      # silently mangled on the way in -- which is exactly the failure mode
+      # cmd/migrate-data must never hit.
+      - name: Apply 0001 (schema)
+        run: mysql -h127.0.0.1 -P3306 -uroot -ptest csm --default-character-set=utf8mb4 < migrations/0001_init.up.sql
+
+      - name: Apply 0002 (foreign keys)
+        run: mysql -h127.0.0.1 -P3306 -uroot -ptest csm --default-character-set=utf8mb4 < migrations/0002_foreign_keys.up.sql
+
+      - name: Assert shape
+        run: |
+          q() { mysql -h127.0.0.1 -P3306 -uroot -ptest csm -N -B -e "$1"; }
+          tables=$(q "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='csm';")
+          rowver=$(q "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='csm' AND column_name='row_version';")
+          fks=$(q    "SELECT COUNT(*) FROM information_schema.table_constraints WHERE table_schema='csm' AND constraint_type='FOREIGN KEY';")
+          echo "tables=$tables row_version=$rowver fks=$fks"
+          [ "$tables" = 15 ] || { echo "::error::expected 15 tables, got $tables"; exit 1; }
+          [ "$rowver" = 15 ] || { echo "::error::expected row_version on all 15 tables, got $rowver"; exit 1; }
+          [ "$fks"    = 5  ] || { echo "::error::expected 5 foreign keys, got $fks"; exit 1; }
+
+      # A migration you cannot roll back is not a migration.
+      - name: Down migration leaves nothing behind
+        run: |
+          mysql -h127.0.0.1 -P3306 -uroot -ptest csm --default-character-set=utf8mb4 < migrations/0001_init.down.sql
+          left=$(mysql -h127.0.0.1 -P3306 -uroot -ptest csm -N -B -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='csm';")
+          [ "$left" = 0 ] || { echo "::error::down left $left tables behind"; exit 1; }
+
+      - name: Re-apply (migrations are repeatable)
+        run: |
+          mysql -h127.0.0.1 -P3306 -uroot -ptest csm --default-character-set=utf8mb4 < migrations/0001_init.up.sql
+          mysql -h127.0.0.1 -P3306 -uroot -ptest csm --default-character-set=utf8mb4 < migrations/0002_foreign_keys.up.sql
+
+      # Guards the two decisions baked into 0001: optimistic concurrency, and
+      # utf8mb4 storing 4-byte characters intact.
+      - name: Behaviour — row_version and utf8mb4
+        run: |
+          out=$(mysql -h127.0.0.1 -P3306 -uroot -ptest csm -N -B --default-character-set=utf8mb4 <<'SQL'
+          INSERT INTO tbl_userinfo (departmentcode, departmentname, username) VALUES ('D1','销售部','张三');
+          UPDATE tbl_userinfo SET username='李四', row_version=row_version+1 WHERE uid=1 AND row_version=1;
+          SELECT IF(ROW_COUNT()=1,'ok fresh-update','FAIL fresh update was rejected');
+          UPDATE tbl_userinfo SET username='王五', row_version=row_version+1 WHERE uid=1 AND row_version=1;
+          SELECT IF(ROW_COUNT()=0,'ok stale-update-blocked','FAIL stale update overwrote a newer row');
+          INSERT INTO tbl_basedata (type,name,keyname,value) VALUES (1,'车系列','民用','测试𠮷');
+          SELECT IF(CHAR_LENGTH(value)=3 AND LENGTH(value)=10,'ok utf8mb4-4byte','FAIL 4-byte character was mangled') FROM tbl_basedata;
+          SQL
+          )
+          echo "$out"
+          if echo "$out" | grep -q FAIL; then
+            echo "::error::behavioural assertion failed (see above)"
+            exit 1
+          fi
+          [ "$(echo "$out" | grep -c '^ok ')" = 3 ] || {
+            echo "::error::expected 3 assertions, got $(echo "$out" | grep -c '^ok ')"; exit 1; }
+
   i18n:
     name: i18n catalogues
     runs-on: ubuntu-latest
