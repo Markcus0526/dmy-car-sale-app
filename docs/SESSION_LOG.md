@@ -10,14 +10,14 @@ Newest entry first.
 
 ## Where things stand
 
-*Updated end of Day 7. Read this first; the entries below are the detail.*
+*Updated end of Day 8. Read this first; the entries below are the detail.*
 
 | | |
 |---|---|
 | **Phase** | Phase 1 (foundation) in progress. **Phase 0 not yet run** |
-| **Sessions logged** | 8 (Day 0–7) |
+| **Sessions logged** | 9 (Day 0–8) |
 | **Plan** | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — 161 sessions, 16 locked decisions |
-| **Next action** | **Phase 1 is now blocked on Phase 0.** Plan day 8–11 (`cmd/migrate-data`) needs the reconciled schema and a live MSSQL to read from. Run the export |
+| **Next action** | Slice 1: add `password_bcrypt` migration, then wire the login handler to `auth.Verify`. **Phase 1 proper is blocked on Phase 0** |
 
 **Green — verified and repeatable**
 
@@ -32,6 +32,8 @@ Newest entry first.
   `node tools/convert-encoding/convert.mjs` (add `--check` to verify only).
 - **Migrations apply to real MySQL 8.4** — 15 tables, 206 columns, 5 FKs, down leaves 0,
   re-apply works. `row_version` blocks stale writes; utf8mb4 stores 4-byte chars intact.
+- **Legacy DES password verification matches two independent implementations**
+  (python-cryptography, openssl legacy provider) byte-for-byte. bcrypt upgrade path tested.
 - 49 permission keys match legacy `FrmMDIMain` exactly.
 - **CI** (`.github/workflows/ci.yml`) — 3 jobs, all 9 steps verified locally.
 
@@ -87,6 +89,91 @@ Newest entry first.
 **Next action**
 -
 ```
+
+---
+
+## Day 8 — 2026-08-01 — Password migration (§6.5, slice 1 groundwork)
+
+Phase 1 is blocked on Phase 0, so took the highest-risk unblocked item instead. Get this
+wrong and **nobody can log in on cutover day**, and the failure presents as "bad password"
+rather than as a bug.
+
+**Done**
+
+- `internal/auth/password.go` — exact reproduction of the legacy DES scheme, bcrypt hashing,
+  and the dual-path `Verify` from §6.5.
+- 12 tests, including cross-implementation vectors.
+
+**Legacy scheme, recovered from the now-readable reference tree**
+
+```
+key    "123456ABCDEF"[:8] = "123456AB"   (UTF-8 bytes)
+iv     12 34 56 78 90 AB CD EF            (Global.DESKeys, hardcoded)
+cipher DES-CBC + PKCS#7                   (DESCryptoServiceProvider defaults)
+output Base64
+```
+
+The plan's §6.5 said the key was `"123456AB"`; the constant is actually `"123456ABCDEF"`
+and `DESEncode` truncates with `Substring(0, 8)`. Same effective key, but the plan would
+have misled anyone implementing from it directly.
+
+`FrmLogon.cs:71-76` encrypts what was typed and **string-compares the ciphertext**. With a
+fixed IV that makes it a deterministic, unsalted, *invertible* transform whose key is
+published in the source. Anyone holding the database holds every plaintext password — and
+since people reuse passwords, the blast radius is not limited to this application.
+
+**Verification — the part that matters**
+
+A round-trip test would pass even with the wrong key, IV or padding, because it would be
+wrong consistently. So the vectors come from **two independent implementations**, neither
+of which is the code under test:
+
+- `python-cryptography` (3DES with K1=K2=K3, which is mathematically single DES — its
+  public API no longer exposes plain DES)
+- `openssl enc -des-cbc -provider legacy`
+
+Both agree byte-for-byte with each other, and Go matches both. .NET's
+`DESCryptoServiceProvider` defaults to CBC + PKCS#7, so agreement with two
+standards-conformant implementations is agreement with the legacy app.
+
+Node was tried first and could not do it: OpenSSL 3 moved DES to the legacy provider, so
+`crypto.createCipheriv("des-cbc", …)` fails with `ERR_OSSL_EVP_UNSUPPORTED`.
+
+Vectors cover empty input, an exact block multiple (full extra padding block), UTF-8
+multibyte (`张三`), and mixed CJK+ASCII (`口令123`).
+
+**Design points**
+
+- `Verify` returns `(ok, needsUpgrade)`. Storage concerns stay in the caller, so the whole
+  thing is testable without a database.
+- **bcrypt takes precedence over legacy even when both are populated** — otherwise clearing
+  the legacy column becomes load-bearing for security rather than merely tidy.
+- A missing credential still burns one bcrypt comparison, so a non-existent user is not
+  distinguishable from a wrong password by response latency.
+- Constant-time compare on the legacy path.
+- `BcryptCost = 12`, above the default 10.
+
+**Test time: 52s → 1.3s**
+
+Cost 12 under `-race` is ~14s per call; four such tests put a minute of pure key stretching
+into every CI run. `export_test.go` lowers the cost for the test binary only, and
+`TestHashPasswordUsesProductionCost` asserts the production constant so the override cannot
+quietly become the real setting.
+
+**Note**
+
+`go get` bumped the language version 1.22 → 1.25 as a side effect of adding
+`golang.org/x/crypto`. CI reads `go-version-file: go.mod`, so this is consistent — but it
+is a real change and was not asked for.
+
+**Blocked**
+
+- **Phase 0 day 1** — export against `csm` on `R-SEVEN64`.
+
+**Next action**
+
+Slice 1 continues: `tbl_userinfo.password_bcrypt` column (a new migration), then the login
+handler wiring `Verify` to storage and performing the upgrade-on-success write.
 
 ---
 
