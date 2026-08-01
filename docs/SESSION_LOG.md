@@ -10,14 +10,14 @@ Newest entry first.
 
 ## Where things stand
 
-*Updated end of Day 9. Read this first; the entries below are the detail.*
+*Updated end of Day 10. Read this first; the entries below are the detail.*
 
 | | |
 |---|---|
 | **Phase** | Phase 1 (foundation) in progress. **Phase 0 not yet run** |
-| **Sessions logged** | 10 (Day 0–9) |
-| **Plan** | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — 161 sessions, 16 locked decisions |
-| **Next action** | Slice 1: **decide session strategy** (signed cookie vs JWT, §3), then wire `POST /api/auth/login`. **Phase 1 proper is blocked on Phase 0** |
+| **Sessions logged** | 11 (Day 0–10) |
+| **Plan** | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — 161 sessions, 17 locked decisions |
+| **Next action** | Slice 1: implement `store/mysql` for `UserRepository` + `SessionRepository`, then wire `POST /api/auth/login`. **Phase 1 proper is blocked on Phase 0** |
 
 **Green — verified and repeatable**
 
@@ -37,6 +37,9 @@ Newest entry first.
 - **`auth.Service.Login`** — 22 tests: bcrypt path, legacy path + upgrade write, upgrade
   failure does not fail login, unknown user indistinguishable, repo errors propagate.
 - **Migration 0003** (`password_bcrypt` + username index) verified on MySQL 8.4, down included.
+- **Migration 0004** (`tbl_session`) verified: unique token hash, FK guard, ON DELETE CASCADE.
+- **`auth.SessionService`** — 33 tests in the package; idle + absolute timeouts, throttled
+  touch, idempotent revoke, immediate `RevokeAllForUser`.
 - 49 permission keys match legacy `FrmMDIMain` exactly.
 - **CI** (`.github/workflows/ci.yml`) — 3 jobs, all 9 steps verified locally.
 
@@ -92,6 +95,91 @@ Newest entry first.
 **Next action**
 -
 ```
+
+---
+
+## Day 10 — 2026-08-01 — D17 sessions (slice 1)
+
+Asked to decide the session strategy myself, as with Q1/Q2.
+
+**D17 — opaque server-side sessions, not JWT**
+
+The deciding factor is specific to this system: there is a permission-administration screen
+(`权限设定`). With a JWT, revoking a user's access does not take effect until the token
+expires — the user keeps working with permissions an administrator has already removed.
+**That is precisely the §10.8 failure this port exists to fix, relocated from the client to
+the token.** Fixing permission enforcement and then making it un-revokable defeats itself.
+
+The usual argument for JWT is horizontal scale. A few dozen users on one server has no
+scale argument to answer.
+
+Supporting choices:
+
+- **HttpOnly cookie, not an `Authorization` header.** An SPA holding a token in
+  `localStorage` is the classic XSS → account-takeover path; that weighs more now external
+  users are in scope (D12).
+- **The token is stored hashed** (SHA-256). A database leak should not yield usable
+  sessions — the same reasoning that puts bcrypt on the password column. SHA-256 rather
+  than bcrypt because the input is 256 bits of CSPRNG output: there is no low-entropy
+  secret to slow an attacker over, and this runs on *every* request.
+- **Permissions load per request**, never baked into the session, so a change takes effect
+  on the next call.
+- **Two clocks**: idle (8h, refreshed on use, so nobody is logged out mid-task) and
+  absolute (24h, un-extendable, bounding a stolen cookie).
+
+**Done**
+
+- `migrations/0004_sessions.{up,down}.sql`
+- `internal/auth/session.go` — issue, validate, revoke, revoke-all, sweep.
+- 11 session tests (33 in the package).
+- CI covers 0004 and asserts the session invariants.
+
+**Verified on MySQL 8.4**
+
+```
+tbl_session          8 columns, char(64) hash, varchar(45) ip (IPv6 fits)
+uq_token_hash        duplicate rejected
+fk_userinfoid        orphan session rejected
+ON DELETE CASCADE    deleting the user removed the session
+0004 down            table gone
+```
+
+`ON DELETE CASCADE` is deliberate and is the **only** cascade in this schema: a deleted user
+must not leave live sessions. Everywhere else a delete should fail loudly rather than
+propagate.
+
+**Two mistakes I made and caught**
+
+1. **A CI ordering bug.** The new sessions step inserts a user and deletes it; the following
+   `row_version` step then did `WHERE uid=1`. AUTO_INCREMENT had already moved past 1, so
+   that update would match nothing and the assertion would fail *for the wrong reason* —
+   a red build blamed on optimistic concurrency when the real cause is test coupling. Both
+   steps now use `LAST_INSERT_ID()`. Confirmed by replaying the two steps in order.
+2. **D17 was inserted above D16** in the decisions table. Reordered.
+
+**Also**
+
+MySQL's Docker entrypoint runs a *temporary* server during init, then stops it and starts
+the real one. A single successful `SELECT 1` can land on the temporary server and be
+followed by a restart — which is what caused an `ERROR 2002 socket` on the first attempt.
+Local checks now require the connection to hold for five consecutive seconds. CI is
+unaffected (the service container has its own health gate), but any local script needs this.
+
+**Half-finished**
+
+- `UserRepository` and `SessionRepository` still have no implementation. `store/mysql` is
+  **not** blocked by Phase 0 — the MySQL schema exists and is verified; only
+  `cmd/migrate-data` needs the live MSSQL. That is the next step.
+- No HTTP endpoint yet.
+
+**Blocked**
+
+- **Phase 0 day 1** — export against `csm` on `R-SEVEN64`.
+
+**Next action**
+
+Implement `store/mysql` for `UserRepository` and `SessionRepository`, tested against the
+Docker MySQL, then wire `POST /api/auth/login`.
 
 ---
 

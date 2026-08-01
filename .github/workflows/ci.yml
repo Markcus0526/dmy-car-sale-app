@@ -81,16 +81,20 @@ jobs:
       - name: Apply 0003 (password_bcrypt)
         run: mysql -h127.0.0.1 -P3306 -uroot -ptest csm --default-character-set=utf8mb4 < migrations/0003_password_bcrypt.up.sql
 
+      - name: Apply 0004 (sessions)
+        run: mysql -h127.0.0.1 -P3306 -uroot -ptest csm --default-character-set=utf8mb4 < migrations/0004_sessions.up.sql
+
       - name: Assert shape
         run: |
           q() { mysql -h127.0.0.1 -P3306 -uroot -ptest csm -N -B -e "$1"; }
           tables=$(q "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='csm';")
           rowver=$(q "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='csm' AND column_name='row_version';")
           fks=$(q    "SELECT COUNT(*) FROM information_schema.table_constraints WHERE table_schema='csm' AND constraint_type='FOREIGN KEY';")
+          # 5 from 0002 + tbl_session -> tbl_userinfo
           echo "tables=$tables row_version=$rowver fks=$fks"
-          [ "$tables" = 15 ] || { echo "::error::expected 15 tables, got $tables"; exit 1; }
+          [ "$tables" = 16 ] || { echo "::error::expected 16 tables (15 + tbl_session), got $tables"; exit 1; }
           [ "$rowver" = 15 ] || { echo "::error::expected row_version on all 15 tables, got $rowver"; exit 1; }
-          [ "$fks"    = 5  ] || { echo "::error::expected 5 foreign keys, got $fks"; exit 1; }
+          [ "$fks"    = 6  ] || { echo "::error::expected 6 foreign keys, got $fks"; exit 1; }
 
           # A bcrypt hash is exactly 60 chars. A wider column would silently
           # accept something that is not a bcrypt hash.
@@ -121,19 +125,48 @@ jobs:
 
       - name: Re-apply (migrations are repeatable)
         run: |
-          for f in 0001_init.up 0002_foreign_keys.up 0003_password_bcrypt.up; do
+          for f in 0001_init.up 0002_foreign_keys.up 0003_password_bcrypt.up 0004_sessions.up; do
             mysql -h127.0.0.1 -P3306 -uroot -ptest csm --default-character-set=utf8mb4 < "migrations/$f.sql"
           done
+
+      # Guards D17: a session cannot be duplicated, cannot be orphaned, and
+      # dies with its user. Revocability is the whole reason for a session
+      # table rather than a JWT.
+      - name: Behaviour — sessions
+        run: |
+          q() { mysql -h127.0.0.1 -P3306 -uroot -ptest csm -N -B --default-character-set=utf8mb4 -e "$1"; }
+          uid=$(q "INSERT INTO tbl_userinfo (departmentcode,username) VALUES ('D1','zhangsan');
+                   SELECT LAST_INSERT_ID();")
+          q "INSERT INTO tbl_session (userinfoid,token_hash,created_at,last_seen_at,expires_at)
+             VALUES ($uid,REPEAT('a',64),NOW(),NOW(),NOW()+INTERVAL 24 HOUR);"
+
+          if q "INSERT INTO tbl_session (userinfoid,token_hash,created_at,last_seen_at,expires_at)
+                VALUES ($uid,REPEAT('a',64),NOW(),NOW(),NOW());" 2>/dev/null; then
+            echo "::error::duplicate token_hash was accepted"; exit 1
+          fi
+
+          if q "INSERT INTO tbl_session (userinfoid,token_hash,created_at,last_seen_at,expires_at)
+                VALUES (999,REPEAT('b',64),NOW(),NOW(),NOW());" 2>/dev/null; then
+            echo "::error::a session for a non-existent user was accepted"; exit 1
+          fi
+
+          left=$(q "DELETE FROM tbl_userinfo WHERE uid=$uid; SELECT COUNT(*) FROM tbl_session;")
+          [ "$left" = 0 ] || { echo "::error::deleting a user left $left sessions behind"; exit 1; }
+          echo "ok sessions: unique, FK-guarded, cascade on user delete"
 
       # Guards the two decisions baked into 0001: optimistic concurrency, and
       # utf8mb4 storing 4-byte characters intact.
       - name: Behaviour — row_version and utf8mb4
         run: |
           out=$(mysql -h127.0.0.1 -P3306 -uroot -ptest csm -N -B --default-character-set=utf8mb4 <<'SQL'
+          -- Uses LAST_INSERT_ID(), not a hardcoded uid: an earlier step deletes
+          -- a user, so AUTO_INCREMENT has already moved past 1 and `WHERE uid=1`
+          -- would match nothing and fail for the wrong reason.
           INSERT INTO tbl_userinfo (departmentcode, departmentname, username) VALUES ('D1','销售部','张三');
-          UPDATE tbl_userinfo SET username='李四', row_version=row_version+1 WHERE uid=1 AND row_version=1;
+          SET @uid = LAST_INSERT_ID();
+          UPDATE tbl_userinfo SET username='李四', row_version=row_version+1 WHERE uid=@uid AND row_version=1;
           SELECT IF(ROW_COUNT()=1,'ok fresh-update','FAIL fresh update was rejected');
-          UPDATE tbl_userinfo SET username='王五', row_version=row_version+1 WHERE uid=1 AND row_version=1;
+          UPDATE tbl_userinfo SET username='王五', row_version=row_version+1 WHERE uid=@uid AND row_version=1;
           SELECT IF(ROW_COUNT()=0,'ok stale-update-blocked','FAIL stale update overwrote a newer row');
           INSERT INTO tbl_basedata (type,name,keyname,value) VALUES (1,'车系列','民用','测试𠮷');
           SELECT IF(CHAR_LENGTH(value)=3 AND LENGTH(value)=10,'ok utf8mb4-4byte','FAIL 4-byte character was mangled') FROM tbl_basedata;
