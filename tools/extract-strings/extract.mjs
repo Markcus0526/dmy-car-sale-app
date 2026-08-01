@@ -264,6 +264,60 @@ function slugify(text) {
 
 const literalRe = /"((?:[^"\\]|\\.)*)"/g;
 
+/**
+ * Extract grid column captions from C1FlexGrid `ColumnInfo` blobs in .resx.
+ *
+ * The .resx files hold no ordinary string resources -- only bitmaps, icons and
+ * colors -- which is why an early pass concluded they held no UI text at all.
+ * That was wrong: 27 of them embed a serialized ColumnInfo blob of the form
+ *
+ *     Columns:0{Name:"vin";Caption:"VIN码";Visible:True}1{Name:...}
+ *
+ * and those Captions are the column headers on every list screen. Missing them
+ * means every grid renders Chinese headers in an English UI.
+ *
+ * `Name` gives a stable, meaningful key stem -- better than deriving one from
+ * the caption text.
+ */
+function extractResxCaptions(entries, seenKeys) {
+  const files = fs
+    .readdirSync(SRC)
+    .filter((f) => f.endsWith(".resx"))
+    .sort();
+
+  for (const file of files) {
+    const buf = fs.readFileSync(path.join(SRC, file));
+    const { text } = decode(buf);
+    const ns = namespaceOf(file.replace(/\.resx$/, ".cs"));
+
+    for (const v of text.matchAll(/<value>([\s\S]*?)<\/value>/g)) {
+      const blob = v[1];
+      if (!/Columns:/.test(blob)) continue;
+
+      for (const col of blob.matchAll(
+        /Name:\\?"((?:[^"\\]|\\.)*)"[^}]*?Caption:\\?"((?:[^"\\]|\\.)*)"/g,
+      )) {
+        const name = col[1];
+        const caption = col[2].replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+        if (!CJK.test(caption)) continue;
+
+        entries.push({
+          key: null,
+          value: caption,
+          verdict: "TRANSLATE",
+          reason: "grid column caption (C1FlexGrid ColumnInfo in .resx)",
+          ns,
+          control: `col_${name}`,
+          file,
+          line: 0,
+          context: `Columns{Name:"${name}";Caption:"${caption}"}`,
+          encoding: "resx",
+        });
+      }
+    }
+  }
+}
+
 function extract() {
   const files = fs
     .readdirSync(SRC)
@@ -329,6 +383,7 @@ function extract() {
     });
   }
 
+  extractResxCaptions(entries, seenKeys);
   assignKeys(entries, seenKeys);
   return { entries, encodings, fileCount: files.length };
 }

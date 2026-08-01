@@ -62,6 +62,12 @@ jobs:
         with:
           node-version: 22
 
+      # Every legacy source must decode with no U+FFFD and an unchanged CJK
+      # codepoint sequence. Writes nothing; the reference tree is regenerable
+      # and not committed.
+      - name: Encoding conversion is lossless
+        run: node tools/convert-encoding/convert.mjs --check
+
       # Placeholder integrity is the check that matters most here: a dropped
       # {0:0} is a runtime FormatException, not a visible typo.
       - name: Verify app catalogue
