@@ -8,5 +8,14 @@
 -- docs/mssql-export.sql must fill before this runs against anything but a
 -- scratch database.
 
--- TODO(phase0): drop the constraints added by 0002. Constraint names come from
--- the ALTER TABLE statements in docs/mysql/schema.sql section 2.
+-- Drops the constraints added by 0002, in reverse order.
+--
+-- Generated from 0002's own ALTER TABLE statements, so the pair cannot drift.
+-- A down migration that silently does nothing is worse than none: a rollback
+-- appears to succeed while leaving the schema constrained.
+
+ALTER TABLE `tbl_storechange` DROP FOREIGN KEY `fk_tbl_storechange_onroadid`;
+ALTER TABLE `tbl_storeout` DROP FOREIGN KEY `fk_tbl_storeout_onroadid`;
+ALTER TABLE `tbl_storein` DROP FOREIGN KEY `fk_tbl_storein_onroadid`;
+ALTER TABLE `tbl_onroad` DROP FOREIGN KEY `fk_tbl_onroad_cartypeid`;
+ALTER TABLE `tbl_permission` DROP FOREIGN KEY `fk_tbl_permission_userinfoid`;
