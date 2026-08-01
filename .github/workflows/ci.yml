@@ -78,6 +78,9 @@ jobs:
       - name: Apply 0002 (foreign keys)
         run: mysql -h127.0.0.1 -P3306 -uroot -ptest csm --default-character-set=utf8mb4 < migrations/0002_foreign_keys.up.sql
 
+      - name: Apply 0003 (password_bcrypt)
+        run: mysql -h127.0.0.1 -P3306 -uroot -ptest csm --default-character-set=utf8mb4 < migrations/0003_password_bcrypt.up.sql
+
       - name: Assert shape
         run: |
           q() { mysql -h127.0.0.1 -P3306 -uroot -ptest csm -N -B -e "$1"; }
@@ -89,6 +92,26 @@ jobs:
           [ "$rowver" = 15 ] || { echo "::error::expected row_version on all 15 tables, got $rowver"; exit 1; }
           [ "$fks"    = 5  ] || { echo "::error::expected 5 foreign keys, got $fks"; exit 1; }
 
+          # A bcrypt hash is exactly 60 chars. A wider column would silently
+          # accept something that is not a bcrypt hash.
+          len=$(q "SELECT character_maximum_length FROM information_schema.columns WHERE table_schema='csm' AND table_name='tbl_userinfo' AND column_name='password_bcrypt';")
+          [ "$len" = 60 ] || { echo "::error::password_bcrypt should be VARCHAR(60), got $len"; exit 1; }
+
+          # Deliberately non-unique: the legacy data has never been constrained.
+          uniq=$(q "SELECT non_unique FROM information_schema.statistics WHERE table_schema='csm' AND table_name='tbl_userinfo' AND index_name='idx_tbl_userinfo_username';")
+          [ "$uniq" = 1 ] || { echo "::error::username index must not be UNIQUE until the data is known clean"; exit 1; }
+
+      # 0003 rolls back independently of 0001; 0001's down drops the whole
+      # table and would mask a broken 0003 down.
+      - name: 0003 down reverses cleanly
+        run: |
+          q() { mysql -h127.0.0.1 -P3306 -uroot -ptest csm -N -B -e "$1"; }
+          mysql -h127.0.0.1 -P3306 -uroot -ptest csm --default-character-set=utf8mb4 < migrations/0003_password_bcrypt.down.sql
+          col=$(q "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='csm' AND table_name='tbl_userinfo' AND column_name='password_bcrypt';")
+          idx=$(q "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema='csm' AND table_name='tbl_userinfo' AND index_name='idx_tbl_userinfo_username';")
+          [ "$col" = 0 ] && [ "$idx" = 0 ] || { echo "::error::0003 down left col=$col idx=$idx"; exit 1; }
+          mysql -h127.0.0.1 -P3306 -uroot -ptest csm --default-character-set=utf8mb4 < migrations/0003_password_bcrypt.up.sql
+
       # A migration you cannot roll back is not a migration.
       - name: Down migration leaves nothing behind
         run: |
@@ -98,8 +121,9 @@ jobs:
 
       - name: Re-apply (migrations are repeatable)
         run: |
-          mysql -h127.0.0.1 -P3306 -uroot -ptest csm --default-character-set=utf8mb4 < migrations/0001_init.up.sql
-          mysql -h127.0.0.1 -P3306 -uroot -ptest csm --default-character-set=utf8mb4 < migrations/0002_foreign_keys.up.sql
+          for f in 0001_init.up 0002_foreign_keys.up 0003_password_bcrypt.up; do
+            mysql -h127.0.0.1 -P3306 -uroot -ptest csm --default-character-set=utf8mb4 < "migrations/$f.sql"
+          done
 
       # Guards the two decisions baked into 0001: optimistic concurrency, and
       # utf8mb4 storing 4-byte characters intact.
