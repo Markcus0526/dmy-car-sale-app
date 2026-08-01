@@ -10,23 +10,26 @@ Newest entry first.
 
 ## Where things stand
 
-*Updated end of Day 5. Read this first; the entries below are the detail.*
+*Updated end of Day 6. Read this first; the entries below are the detail.*
 
 | | |
 |---|---|
 | **Phase** | Phase 1 (foundation) in progress. **Phase 0 not yet run** |
-| **Sessions logged** | 6 (Day 0–5) |
+| **Sessions logged** | 7 (Day 0–6) |
 | **Plan** | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — 161 sessions, 14 locked decisions |
-| **Next action** | Convert the 130 C# sources to UTF-8 into a reference tree (plan day 4) |
+| **Next action** | Plan days 6–7: draft `migrations/0001_init.up.sql` skeleton from `docs/mysql/schema.sql`, marking every field Phase 0 must confirm |
 
 **Green — verified and repeatable**
 
 - **Go backend compiles, vets and tests clean under `-race`.** Go 1.26.5 installed to the
   scratchpad (no sudo needed): `export PATH="$SP/go/bin:$PATH"`.
 - `web/` builds under strict TS; dev server serves; app catalogue 90/90.
-- String extraction: 1,154 literals → 1,023 TRANSLATE (370 keys) / 86 NEVER / 45 DROP /
-  **0 REVIEW**. Re-runnable: `node tools/extract-strings/extract.mjs`.
-- English catalogue: 370/370 translated, `verify.mjs` exit=0 on both catalogues.
+- String extraction: 1,447 literals → 1,316 TRANSLATE (**472 keys**) / 86 NEVER / 45 DROP /
+  **0 REVIEW**. Covers `.cs` literals *and* `.resx` grid captions.
+  Re-runnable: `node tools/extract-strings/extract.mjs`.
+- English catalogue: **472/472** translated, `verify.mjs` exit=0 on both catalogues.
+- Encoding conversion lossless: 201 files, 5,435 CJK codepoints, 0 failures.
+  `node tools/convert-encoding/convert.mjs` (add `--check` to verify only).
 - 49 permission keys match legacy `FrmMDIMain` exactly.
 - **CI** (`.github/workflows/ci.yml`) — 3 jobs, all 9 steps verified locally.
 
@@ -82,6 +85,77 @@ Newest entry first.
 **Next action**
 -
 ```
+
+---
+
+## Day 6 — 2026-08-01 — UTF-8 reference tree (plan day 4)
+
+**Done**
+
+- `tools/convert-encoding/convert.mjs` — per-file encoding detection, lossless conversion
+  to `reference/` (gitignored; regenerates in under a second). Original tree untouched.
+- Extractor extended to scan `.resx` grid captions.
+- Catalogue **370 → 472 keys**, all translated.
+- `GO_MIGRATION_PLAN.md` §11.7 rewritten — for the second time, see below.
+
+**Verified**
+
+```
+conversion   201 files   5,435 CJK codepoints   0 failures
+             decoded original === converted file, exactly
+             original tree: 0 modified files
+catalogue    472/472      verify exit=0
+CI (local)   Go PASS   Web PASS   i18n PASS (incl. new --check step)
+```
+
+**Correction — and this one was mine to begin with**
+
+Day 1 recorded that `.resx` files contain zero Chinese. That was measured with the
+byte-range grep I later proved unreliable, and it was wrong. Being able to plain-grep the
+UTF-8 tree exposed it within a minute:
+
+> **27 of 63 `.resx` files embed a serialized C1FlexGrid `ColumnInfo` blob containing 144
+> Chinese column captions — 116 of which appear nowhere in the `.cs` sources.**
+
+These are the column headers on **every list screen**. Without them each grid would have
+rendered Chinese headers inside an English UI — a whole category of missing translation,
+invisible until someone opened a grid.
+
+The `Name` field inside the blob gives a far better key stem than anything derived from
+caption text: `common.col_inprice` rather than a slug.
+
+Worth drawing the lesson out: the reference tree paid for itself immediately, and not for
+the reason it was scheduled. It was planned as a *readability* aid for porting; it earned
+its keep as an *auditing* aid, by making a bad measurement obvious.
+
+**Key stability — a real weakness, caught by the verifier**
+
+Adding a new source shifted value frequencies, so 18 values were promoted to `common.col_*`
+keys and their previous keys were orphaned. `verify.mjs` reported `missing: 0, extra: 18` —
+no translation lost, 18 stale keys pruned.
+
+Keys are **not stable** across extractor changes. That is acceptable while the catalogue is
+reference material, but once keys are referenced from `web/src/locales/` a rename becomes a
+breaking change. The verifier is what makes this safe; do not weaken it.
+
+**Also noted**
+
+- The finance grid columns confirm §6.1's computed fields by name — `距离展期天数`,
+  `距离免息天数`, `累计利息`, `货款金额`, `货款余额`, `全额还款到期日期`. Independent
+  corroboration of the interest engine's outputs, from the UI side.
+- More legacy typos, and the `.resx` sometimes has it *right* where the `.cs` has it wrong:
+  `.resx` says `发动机前码` (correct 码) while the `.cs` label says `发动机前吗`.
+  Also new: `转库日其` (should be 期).
+
+**Blocked**
+
+- **Phase 0 day 1** — export against `csm` on `R-SEVEN64`. Still the only external blocker.
+
+**Next action**
+
+Plan days 6–7: draft `migrations/0001_init.up.sql` from `docs/mysql/schema.sql`, explicitly
+marking every field Phase 0 must confirm (defaults, indexes, checks, collation) so the gaps
+are visible rather than silently guessed.
 
 ---
 
