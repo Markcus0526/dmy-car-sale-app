@@ -122,6 +122,7 @@ func authedServer(t *testing.T, password string) (http.Handler, *memUserRepo) {
 		log,
 		auth.NewService(users, log),
 		auth.NewSessionService(&memSessionRepo{byHash: map[string]*auth.Session{}}),
+		nil,
 	)
 	return srv.Handler(), users
 }

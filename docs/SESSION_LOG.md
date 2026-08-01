@@ -10,14 +10,14 @@ Newest entry first.
 
 ## Where things stand
 
-*Updated end of Day 13. Read this first; the entries below are the detail.*
+*Updated end of Day 18 (one week). Read this first; the entries below are the detail.*
 
 | | |
 |---|---|
 | **Phase** | Phase 1 (foundation) in progress. **Phase 0 not yet run** |
-| **Sessions logged** | 14 (Day 0–13) |
-| **Plan** | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — 161 sessions, 17 locked decisions |
-| **Next action** | Slice 3 continues: the reusable React grid + filter UI on top of `internal/query`. **Phase 1 proper is blocked on Phase 0** |
+| **Sessions logged** | 19 (Day 0–18) |
+| **Plan** | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — **158** sessions, **18** locked decisions |
+| **Next action** | Slice 4 continues: on-road create/edit modal, then Excel import (needs Q3 answered). **Phase 1 proper is blocked on Phase 0** |
 
 **Green — verified and repeatable**
 
@@ -48,6 +48,10 @@ Newest entry first.
 - 49 permission keys match legacy `FrmMDIMain` exactly.
 - **`internal/query`** — parameterised filter builder replacing `FrmSearch`; 16 tests,
   LIKE escaping verified against real MySQL.
+- **Reusable `DataGrid` + `FilterBar`** (TanStack headless, D5) — one grid for every list
+  screen, replacing eleven copy-pasted filter blocks.
+- **First real list screen**: on-road vehicles, filter → SQL → grid, permission-gated.
+  9 integration tests including literal `%`, Chinese filtering, inclusive date bounds.
 - **`./scripts/check.sh`** — every check in one command; `--db` adds the MySQL migration and
   integration checks. **No CI**: GitHub Actions was removed by request, so nothing runs
   automatically. Run this before committing.
@@ -104,6 +108,97 @@ Newest entry first.
 **Next action**
 -
 ```
+
+---
+
+## Days 14–18 — 2026-08-02 — Slice 3 complete, slice 4 begun (one week)
+
+**Plan reconciled first — it had drifted in three places**
+
+| Drift | Reality |
+|---|---|
+| §12 Progress said everything "Not started" | 14 sessions of work had happened |
+| §1.1 mandated `tbl_i18n` + `tbl_userinfo.locale` | Database i18n was **scoped out**. Slice 2 was budgeting **3 sessions for a translation admin screen we agreed not to build** |
+| Day 4/5 said "1,156 literals", "`.resx` hold no strings" | Measured: **1,447** literals, and `.resx` holds **144 grid captions** |
+
+The i18n one mattered: recorded as **D18**, total drops **161 → 158 sessions**. A plan that
+contradicts an agreed decision is worse than no plan, because it gets followed.
+
+**Built**
+
+- `DataGrid` (TanStack headless, D5) + `FilterBar` — the one grid and one filter for every
+  list screen, replacing eleven copy-pasted blocks.
+- `migrations/0005_vw_onroad` — reconstructed from the §3 column contract.
+- `OnRoadRepo` with a `query.Fields` allowlist, `MaxListRows` bound, decimal-as-string.
+- `POST /api/onroad/list`, permission-gated on `在途/未提车辆管理`.
+- The on-road screen: filter → SQL → grid, both locales.
+
+**Verified**
+
+```
+./scripts/check.sh --db          ALL PASS
+  16 base tables + 1 view, full rollback 0, re-apply 17
+  schema behaviour               5 assertions
+  store integration              21 tests
+on-road integration              9/9
+```
+
+**`vw_onroad`: the one thing I could not know, and what I did about it**
+
+The column contract gives the shape exactly — `tbl_onroad` plus `carseries` — but not
+whether the original used INNER or LEFT JOIN. That is not cosmetic:
+
+- **INNER** — a vehicle with an orphaned `cartypeid` **vanishes** from every screen and
+  report built on the view.
+- **LEFT** — it appears with a null `carseries`.
+
+Chose LEFT. If the original was INNER, this shows extra rows, which is visible and
+reportable; the other way round loses rows silently, and silent row loss in a financial
+system is the worse failure by a wide margin. `TODO(phase0)` on the migration.
+
+**A refinement the FK forced.** Seeding an orphan failed — 0002's foreign key correctly
+refuses one. Which clarifies the scope: **once the FK exists, INNER and LEFT are
+equivalent.** The choice only matters for legacy data loaded *before* the constraint — which
+is exactly the data this port migrates, and exactly why §5.3 orders load → verify →
+constrain. The test now sets `FOREIGN_KEY_CHECKS = 0` to reproduce that window rather than
+pretending it cannot happen.
+
+**Finding for `cmd/migrate-data`: 107 columns are NOT NULL with no DEFAULT**
+
+Hit while seeding — `tbl_cartype` alone needs 16 values. Every one must be supplied on
+insert, and the inferred schema cannot say what the source defaults were. That makes the
+`TODO(phase0): confirm COLUMN_DEFAULT` marker (export step 4) considerably more
+consequential than it reads: without it, `migrate-data` either fails on every row or invents
+values.
+
+**Design points**
+
+- **`POST /api/onroad/list`, not `GET`.** The filter is a structured object; encoding it into
+  a query string means inventing a serialisation and parsing it back — precisely the
+  string-munging §2.6 exists to remove. Still a read, still gated on read permission.
+- **`MaxListRows = 500`, and truncation is reported.** The legacy pulled whole tables into a
+  client-side DataSet (§2.4). A silently capped list reads as "there are only this many",
+  which is how people draw wrong conclusions from a screen.
+- **`ORDER BY uid`, not `carseries`.** Chinese display order is applied in Go (D16);
+  `utf8mb4_unicode_ci` does not reproduce `Chinese_PRC_CI_AS`.
+- **Table/view counts in `check.sh` are now separated.** `information_schema.tables` counts
+  both, so a bare `COUNT(*)` silently changes meaning every time a view is added.
+
+**Half-finished**
+
+- On-road is read-only: no create/edit modal yet.
+- Excel import (§11.6) is untouched and needs **Q3** answered.
+- `vw_storein` / `vw_storeout` / `vw_speccar` / `vw_department` not built — their contracts
+  are known but the joins are less obvious than `vw_onroad`'s, so they wait for the dump.
+
+**Blocked**
+
+- **Phase 0 day 1** — export against `csm` on `R-SEVEN64`. Nineteen sessions.
+
+**Next action**
+
+On-road create/edit modal over the shared grid, establishing the modal pattern for the ~25
+`*Add`/`*Edit` screens.
 
 ---
 

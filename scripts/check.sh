@@ -101,14 +101,15 @@ done
 m() { docker exec -i "$CONTAINER" mysql -uroot -ptest csm --default-character-set=utf8mb4 2>/dev/null; }
 q() { docker exec -i "$CONTAINER" mysql -uroot -ptest csm -N -B --default-character-set=utf8mb4 -e "$1" 2>/dev/null; }
 
-for f in 0001_init.up 0002_foreign_keys.up 0003_password_bcrypt.up 0004_sessions.up; do
+for f in 0001_init.up 0002_foreign_keys.up 0003_password_bcrypt.up 0004_sessions.up 0005_vw_onroad.up; do
   if m < "migrations/$f.sql"; then pass "apply $f"; else fail "apply $f"; fi
 done
 
 check() { # name expected actual
   [[ "$3" == "$2" ]] && pass "$1 ($3)" || fail "$1: got $3, want $2"
 }
-check "16 tables"             16 "$(q "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='csm';")"
+check "16 base tables"        16 "$(q "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='csm' AND table_type='BASE TABLE';")"
+check "1 view"                 1 "$(q "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='csm' AND table_type='VIEW';")"
 check "row_version on 15"     15 "$(q "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='csm' AND column_name='row_version';")"
 check "6 foreign keys"         6 "$(q "SELECT COUNT(*) FROM information_schema.table_constraints WHERE table_schema='csm' AND constraint_type='FOREIGN KEY';")"
 # Exactly 60: a bcrypt hash always is, and a wider column would accept
@@ -122,15 +123,15 @@ check "username idx non-uniq"  1 "$(q "SELECT non_unique FROM information_schema
 # Rolled back in REVERSE order, which is what golang-migrate does and what the
 # down files assume: each undoes only its own migration. Running 0001's down
 # alone leaves tbl_session behind, because that table belongs to 0004.
-for f in 0004_sessions.down 0003_password_bcrypt.down 0002_foreign_keys.down 0001_init.down; do
+for f in 0005_vw_onroad.down 0004_sessions.down 0003_password_bcrypt.down 0002_foreign_keys.down 0001_init.down; do
   m < "migrations/$f.sql"
 done
-check "full rollback"          0 "$(q "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='csm';")"
+check "full rollback"          0 "$(q "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='csm';")"  # tables AND views
 
-for f in 0001_init.up 0002_foreign_keys.up 0003_password_bcrypt.up 0004_sessions.up; do
+for f in 0001_init.up 0002_foreign_keys.up 0003_password_bcrypt.up 0004_sessions.up 0005_vw_onroad.up; do
   m < "migrations/$f.sql"
 done
-check "re-apply"              16 "$(q "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='csm';")"
+check "re-apply"              17 "$(q "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='csm';")"  # 16 tables + 1 view
 
 # Guards the decisions baked into the schema. LAST_INSERT_ID(), not a
 # hardcoded uid: AUTO_INCREMENT moves as earlier checks insert and delete.
@@ -147,14 +148,21 @@ DELETE FROM tbl_userinfo WHERE uid=@uid;
 SELECT IF((SELECT COUNT(*) FROM tbl_session)=0,'ok session-cascade','FAIL user delete left sessions');
 INSERT INTO tbl_basedata (type,name,keyname,value) VALUES (1,'车系列','民用','测试𠮷');
 SELECT IF(CHAR_LENGTH(value)=3 AND LENGTH(value)=10,'ok utf8mb4-4byte','FAIL 4-byte character mangled') FROM tbl_basedata;
+SET FOREIGN_KEY_CHECKS = 0;
+INSERT INTO tbl_onroad (billno,billdate,vin,engineno,cartypeid,cartype,inflag,inkind)
+  VALUES ('B1',NOW(),'ORPHAN','E1',999999,'C9',0,0);
+SET FOREIGN_KEY_CHECKS = 1;
+-- LEFT JOIN, not INNER: an orphaned cartypeid must not make the vehicle vanish
+-- from every screen and report (see migrations/0005).
+SELECT IF((SELECT COUNT(*) FROM vw_onroad WHERE vin='ORPHAN')=1,'ok orphan-visible','FAIL orphan vanished from vw_onroad');
 SQL
 )
 if echo "$out" | grep -q FAIL; then
   fail "schema behaviour"; echo "$out" | sed 's/^/        /'
-elif [[ "$(echo "$out" | grep -c '^ok ')" == 4 ]]; then
-  pass "schema behaviour (4 assertions)"
+elif [[ "$(echo "$out" | grep -c '^ok ')" == 5 ]]; then
+  pass "schema behaviour (5 assertions)"
 else
-  fail "schema behaviour: expected 4 assertions, got $(echo "$out" | grep -c '^ok ')"
+  fail "schema behaviour: expected 5 assertions, got $(echo "$out" | grep -c '^ok ')"
 fi
 
 section "Store integration"

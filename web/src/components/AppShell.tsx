@@ -5,6 +5,7 @@ import { NavLink, Route, Routes, Navigate } from "react-router-dom";
 import type { MenuNode, MeResponse } from "../api/client";
 import LanguageSwitcher from "./LanguageSwitcher";
 import PlaceholderPage from "../pages/PlaceholderPage";
+import OnRoadPage from "../pages/OnRoadPage";
 
 /** Flatten the tree to the leaves that own a route. */
 function leaves(nodes: MenuNode[]): MenuNode[] {
@@ -100,10 +101,16 @@ export default function AppShell({ me, onLogout }: AppShellProps) {
                 key={node.id}
                 path={node.path}
                 element={
-                  <PlaceholderPage
-                    labelKey={node.labelKey}
-                    permissionKey={node.permissionKey}
-                  />
+                  // Screens are wired in as their slice lands; the rest keep
+                  // the placeholder so nav stays complete and honest.
+                  node.id === "onroad" ? (
+                    <OnRoadPage />
+                  ) : (
+                    <PlaceholderPage
+                      labelKey={node.labelKey}
+                      permissionKey={node.permissionKey}
+                    />
+                  )
                 }
               />
             ))}

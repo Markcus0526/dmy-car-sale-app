@@ -48,6 +48,7 @@ expensive.
 | D14 | **§11.2: compute in `decimal`; equivalence tolerance ±0.01/row, ±0.05/report total** | See §2.2. `0.9` and `0.68` are exact in decimal and inexact in binary float, so decimal is more correct at the multiplication step. Migrated historical values are preserved as-is so issued invoices still reconcile | Finance engine + test assertions |
 | D15 | **§11.4: `row_version INT UNSIGNED NOT NULL DEFAULT 1` on every table** | A counter is unambiguous where `updated_at` collides inside one clock tick and suffers clock skew. Whole-row comparison is fragile around NULL and DECIMAL equality. **No `created_at`/`updated_at`** — there is no source data, so every migrated row would carry a fabricated timestamp | Every table's DDL |
 | D16 | **§5.4: storage collation `utf8mb4_unicode_ci`; display order sorted in Go via `x/text/collate`** | `utf8mb4_zh_0900_as_cs` matches legacy pinyin order but is accent- and case-**sensitive**, silently changing equality for `读写` and the `是否*` columns. Changing sort order is a display bug; changing equality is a correctness bug | Every table's DDL + all list queries |
+| D18 | **No database i18n — `tbl_basedata` values display as stored; locale in `localStorage`** | Scoped out by the user. Accepts English chrome around Chinese dropdown options. Removes `tbl_i18n` and its admin screen (−3 sessions) and keeps `tbl_basedata` byte-identical to source for the Phase 1 checksums | Lookup layer only, not screens |
 | D17 | **Opaque server-side sessions in `tbl_session`, HttpOnly cookie — not JWT** | This system has a permission-admin screen (`权限设定`). With a JWT, revoking access does not take effect until the token expires — the same §10.8 failure, moved from the client to the token. Token stored **hashed**; permissions loaded per request; HttpOnly cookie rather than `localStorage` avoids the XSS→takeover path that matters more now external users are in scope (D12) | Session layer + auth middleware |
 
 ### 1.1 Internationalisation — the split that matters
@@ -70,15 +71,22 @@ validation messages, report titles. ~1,500–2,500 strings. Ordinary i18n.
 
 | Type | Domains | Treatment |
 |---|---|---|
-| **Enums — translate** | `进货途径`, `进车状态`, `返利状态`, `销售方式`, `地区`, `行业`, `特种车类型`, the four `是否*` flags | `tbl_i18n(domain, key, locale, label)` |
+| **Enums — *would* be translatable** | `进货途径`, `进车状态`, `返利状态`, `销售方式`, `地区`, `行业`, `特种车类型`, the four `是否*` flags | **Not translated (D18).** Displayed as stored |
 | **Proper nouns — never translate** | `销售顾问`, `经手人`, `批复人` | These are **people's names**. Pass through verbatim in both locales |
 | **Judgement call** | `车系列`, `车型大类`, `库位` | Manufacturer/site terms. Default to keeping Chinese; accept a supplied English label if the business has one |
 
-Translations live in a **new** `tbl_i18n` table rather than `name_en` columns on `tbl_basedata`,
-so the migrated table stays byte-identical to source and the Phase 1 checksums remain meaningful.
+> **D18 — no database i18n.** Scoped out by the user. `tbl_basedata` values are displayed
+> exactly as stored, so an English-locale user sees English chrome around Chinese options
+> (`地区`, `行业`, `销售方式`). Accepted deliberately. This removes the `tbl_i18n` table and
+> its admin screen — **3 sessions off slice 2** — and keeps `tbl_basedata` byte-identical to
+> source, which the Phase 1 checksums depend on.
+>
+> Reversible: the allowlist indirection in `internal/query` and the key-based catalogue mean
+> adding a translation table later touches the lookup, not the screens.
 
-**Mechanics.** `react-i18next` with `locales/zh-CN.json` + `locales/en.json`. Locale resolves from
-a new `tbl_userinfo.locale` column, defaulting to `Accept-Language`. Backend stays locale-agnostic
+**Mechanics.** `react-i18next` with `locales/zh-CN.json` + `locales/en.json`. Locale lives in
+`localStorage` (D18 — no `tbl_userinfo.locale` column), defaulting to `Accept-Language`. It
+therefore does not roam between devices. Backend stays locale-agnostic
 except where it renders text: **error responses return codes, not prose**; report/Excel/PDF
 endpoints take a `lang` parameter. The shared renderer (§7) takes a locale and each of the 11
 reports declares header *keys* — one renderer change covers all eleven.
@@ -187,7 +195,7 @@ per session, which is conservative once review, debugging, and context reload ar
 
 | | |
 |---|---|
-| **Total sessions** | **161** |
+| **Total sessions** | **158** (161 − 3 for D18) |
 | **Elapsed** | ~32 weeks ≈ **7.5 months** at 5 days/week (≈6 months at 6 days/week) |
 | **Estimated deliverable** | ~78,000 lines (Go backend + tests, React frontend + tests, migrations, tooling) |
 | **Estimated API cost** | **$6,000–7,000**, range $5,000–10,000 (see §10, R1) |
@@ -199,7 +207,7 @@ per session, which is conservative once review, debugging, and context reload ar
 | 0 — Recover ground truth | 2 | 1–2 | **Hard gate.** Live DB access |
 | 1 — Foundation | 16 | 3–18 | Phase 0 |
 | 2 — Views and procedures | 22 | 19–40 | Phase 0, 1 + answers to Q1, Q2 |
-| 3 — Vertical slices | 73 | 41–113 | Phase 1 (Phase 2 only for slice 9) |
+| 3 — Vertical slices | 70 | 41–110 | Phase 1 (Phase 2 only for slice 9) |
 | 4 — Reports, statistics, charts | 37 | 114–150 | Phase 2, 3 |
 | 5 — Cutover | 11 | 151–161 | All |
 
@@ -225,8 +233,8 @@ lines; that number is a guess until day 1 completes.
 | Days | Work |
 |---:|---|
 | 3 | `go mod init`, §3 directory layout, config from environment (the hardcoded `sa` password goes), `docker-compose` MySQL |
-| 4 | Convert all 130 sources to UTF-8 into a reference tree. Encoding is **mixed** GB18030 / UTF-8-BOM — detect per file (§11.7). **Verify** report titles (§7), the 17 domain names (§5.6), and `读写`/`不可用` (§6.4) survive intact |
-| 5 | Extract the **1,156 Chinese literals from `.cs` / `.Designer.cs`** → `locales/zh-CN.json` **as translation keys, not raw literals** (D7). The `.resx` files hold no strings — see §11.7. Do not use `grep -P` for byte-range detection; it silently returns 0 on these files |
+| 4 | Convert all 201 sources to UTF-8 into a reference tree. Encoding is **three-way** — GB18030 84, UTF-8-BOM 64, UTF-8 53 — detect per file (§11.7). **DONE**: **Verify** report titles (§7), the 17 domain names (§5.6), and `读写`/`不可用` (§6.4) survive intact |
+| 5 | Extract **1,447 Chinese literals** → 472 keys. Sources are `.cs`/`.Designer.cs` **and** `.resx` `ColumnInfo` grid captions (144, of which 116 appear nowhere in `.cs`) — the earlier "resx hold no strings" claim was wrong, see §11.7. Keys, not raw literals (D7). Do not use `grep -P` for byte-range detection; it silently returns 0 on these files. **DONE** |
 | 6–7 | `migrations/0001_init.up.sql` from reconciled DDL. **Decide `row_version` (§11.4) and the Chinese collation strategy (§5.4)** — both change every table's DDL |
 | 8–11 | `cmd/migrate-data`: table-by-table with per-table row counts, decimal sum checksums, and an orphan report per FK. Load order per §8 Phase 1.4 |
 | 12 | Run against a production copy. Resolve orphans |
@@ -274,8 +282,8 @@ software from slice 1 (D8).
 
 | Slice | Days | Split | Notes |
 |---|---:|---|---|
-| 1 — auth, users, permissions | 41–49 | BE 4 / UI 3 / i18n scaffold 2 | §6.4 server-side enforcement, §6.5 DES→bcrypt dual path. i18n provider + switcher + `tbl_userinfo.locale` |
-| 2 — reference data | 50–59 | BE 4 / UI 3 / `tbl_i18n` 3 | 17 domains (§5.6). Answers Q4, Q5. Includes the translation admin screen |
+| 1 — auth, users, permissions | 41–49 | BE 4 / UI 3 / i18n scaffold 2 | §6.4 server-side enforcement, §6.5 DES→bcrypt dual path. i18n provider + switcher (locale in `localStorage`, D18). **DONE** |
+| 2 — reference data | 50–56 | BE 4 / UI 3 | 17 domains (§5.6). Answers Q4, Q5. **−3 sessions**: no `tbl_i18n`, no translation admin screen (D18) |
 | 3 — **shared filter + grid** | 60–65 | 6 | Structured filter DTO replacing `FrmSearch` (§2.6) + the reusable grid. **Gates slices 4–8.** Highest-leverage work in the project |
 | 4 — on-road vehicles | 66–73 | BE 4 / UI 3 / i18n 1 | Excel import (§11.6). Q3 must be answered by day 66 |
 | 5 — store-in | 74–83 | BE 6 / UI 3 / i18n 1 | Largest slice. Movement transaction (§6.2) + server-side `batchno` with `HH` and a `UNIQUE` index (§6.6) |
@@ -376,14 +384,35 @@ remember is the most expensive way to lose a day.
 
 ## 12. Progress
 
+*Updated end of Day 13. Work has run out of plan order because Phase 0 is blocked — see
+[SESSION_LOG.md](SESSION_LOG.md) for the per-session detail.*
+
 | Phase | Sessions | Status |
 |---|---:|---|
-| 0 — Ground truth | 2 | Not started |
-| 1 — Foundation | 16 | Not started |
-| 2 — Views and procedures | 22 | Not started |
-| 3 — Vertical slices | 73 | Not started |
+| 0 — Ground truth | 2 | **BLOCKED** — needs the live `csm` database |
+| 1 — Foundation | 16 | **Partial.** Days 3–7, 13–18 done. Days 8–12 (`cmd/migrate-data`) blocked on Phase 0 |
+| 2 — Views and procedures | 22 | Not started — blocked on Phase 0 |
+| 3 — Vertical slices | 70 | **Slice 1 done.** Slice 3 backend done (`internal/query`); its grid/filter UI remains |
 | 4 — Reports, statistics, charts | 37 | Not started |
 | 5 — Cutover | 11 | Not started |
 
-**Next action:** run [mssql-export.sql](mssql-export.sql) against the live `csm` database, and put
-Q1 and Q2 to the business in the same pass.
+**Total is now 158 sessions** (was 161): D18 removes 3 from slice 2.
+
+**Done out of order, because Phase 0 blocks the schema-dependent work:**
+
+| Built | Where |
+|---|---|
+| Go + React skeleton, i18n, nav, error-code envelope | `cmd/`, `internal/http`, `web/` |
+| UTF-8 reference tree + string extraction + verification | `tools/convert-encoding`, `tools/extract-strings` |
+| Migrations 0001–0004, verified against MySQL 8.4 | `migrations/`, `tools/gen-migration` |
+| Legacy DES → bcrypt password migration | `internal/auth/password.go` |
+| Sessions (D17), login service, `store/mysql` | `internal/auth`, `internal/store/mysql` |
+| Working end-to-end login with permission-filtered nav | all of the above |
+| Parameterised filter replacing `FrmSearch` | `internal/query` |
+| `./scripts/check.sh` (replaces CI) | `scripts/` |
+
+**Next action:** the React data grid + filter UI on top of `internal/query`, finishing slice 3
+and unblocking slices 4–8.
+
+**Still blocked:** Phase 0. Fourteen sessions have routed around it. Phase 2's 22 sessions stay
+unsized, and the missing non-PK indexes in `0001_init.up.sql` remain unknown.

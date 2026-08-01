@@ -260,3 +260,106 @@ body {
   background: #f0f2f5;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
+
+/* ---------- filter bar (replaces FrmSearch) ---------- */
+
+.filter {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.filter__row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.filter__field, .filter__op, .filter__value {
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+.filter__field { flex: 0 0 190px; }
+.filter__op    { flex: 0 0 130px; }
+.filter__value { flex: 1; min-width: 0; }
+.filter__remove { flex: 0 0 auto; padding: 5px 10px; }
+
+.filter__actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.filter__spacer  { flex: 1; }
+.filter__hint    { margin: 8px 0 0; color: var(--muted); font-size: 12px; }
+
+/* ---------- data grid (replaces C1FlexGrid) ---------- */
+
+.grid {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+/* Wide tables scroll inside their own container so the page never scrolls
+   horizontally — these grids run to 17 columns on the sales screens. */
+.grid__scroll { overflow-x: auto; }
+.grid__table  { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+.grid__th {
+  position: sticky;
+  top: 0;
+  padding: 9px 12px;
+  background: #f7f8fa;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.grid__th--sortable { cursor: pointer; user-select: none; }
+.grid__th--sortable:hover { background: #eef1f5; }
+.grid__sort { margin-left: 5px; font-size: 9px; color: var(--muted); }
+
+.grid__td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #eef0f3;
+  white-space: nowrap;
+}
+.grid__tr:hover { background: #fafbfc; }
+.grid__tr--clickable { cursor: pointer; }
+
+.grid__empty, .grid__footer {
+  padding: 14px 16px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.grid__footer { border-top: 1px solid var(--border); }
+
+.grid__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--muted);
+}
+
+/* Numeric columns read far better right-aligned and tabular — these are
+   prices and quantities, and ragged decimals are hard to scan. */
+.grid__td--num, .grid__th--num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.page--wide { max-width: none; }
+.notice {
+  margin-bottom: 12px;
+  padding: 9px 12px;
+  border: 1px solid #f3d9a4;
+  border-radius: var(--radius);
+  background: #fffbf0;
+  color: #8a5300;
+  font-size: 13px;
+}

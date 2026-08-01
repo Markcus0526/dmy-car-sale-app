@@ -1,3 +1,5 @@
+import type { Filter } from "../types/filter";
+
 /**
  * Thin fetch wrapper.
  *
@@ -124,4 +126,48 @@ export async function logout(): Promise<void> {
   } catch {
     /* deliberately ignored — see above */
   }
+}
+
+// ---------------------------------------------------------------------------
+// On-road vehicles (slice 4)
+
+export interface OnRoadRow {
+  uid: number;
+  billno: string;
+  billdate: string | null;
+  vin: string;
+  engineno: string;
+  cartypeid: number;
+  cartype: string;
+  carname: string;
+  colorcode: string;
+  colorname: string;
+  subsets: string;
+  insidesetcode: string;
+  insidesetname: string;
+  carstate: string;
+  property: string;
+  /** Decimal string — never a number. See types/decimal.ts. */
+  inprice: string | null;
+  inflag: number;
+  inkind: number;
+  carseries: string;
+}
+
+export interface OnRoadListResponse {
+  rows: OnRoadRow[];
+  truncated: boolean;
+  limit: number;
+}
+
+/**
+ * POST, not GET: the filter is a structured object, and encoding it into a
+ * query string would mean inventing a serialisation and parsing it back --
+ * the string-munging this whole design replaces. It is still a read.
+ */
+export function listOnRoad(filter: Filter): Promise<OnRoadListResponse> {
+  return apiFetch<OnRoadListResponse>("/api/onroad/list", {
+    method: "POST",
+    body: JSON.stringify({ filter }),
+  });
 }
