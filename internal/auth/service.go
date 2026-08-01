@@ -29,6 +29,9 @@ type UserRepository interface {
 	// FindByUsername returns nil (with a nil error) when no such user exists.
 	FindByUsername(ctx context.Context, username string) (*User, error)
 
+	// FindByID returns nil (with a nil error) when no such user exists.
+	FindByID(ctx context.Context, id int64) (*User, error)
+
 	// UpgradePassword writes the bcrypt hash and clears the legacy password
 	// column, atomically.
 	UpgradePassword(ctx context.Context, userID int64, bcryptHash string) error
@@ -86,6 +89,29 @@ func (s *Service) Login(ctx context.Context, username, password string) (*Authen
 	}
 
 	return &Authenticated{User: *user, Permissions: perms, Upgraded: upgraded}, nil
+}
+
+// UserByID loads the user behind an authenticated session.
+//
+// A session whose user has been deleted is treated as invalid rather than as
+// an internal error: the row is gone, so the session should be too.
+func (s *Service) UserByID(ctx context.Context, id int64) (User, error) {
+	u, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return User{}, err
+	}
+	if u == nil {
+		return User{}, ErrInvalidCredentials
+	}
+	return *u, nil
+}
+
+// Permissions loads a user's permissions.
+//
+// Called on every authenticated request rather than cached in the session, so
+// an administrator's change takes effect on the next call (D17).
+func (s *Service) Permissions(ctx context.Context, userID int64) (Set, error) {
+	return s.repo.LoadPermissions(ctx, userID)
 }
 
 // upgrade re-hashes a just-verified legacy credential with bcrypt.

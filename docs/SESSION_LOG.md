@@ -10,14 +10,14 @@ Newest entry first.
 
 ## Where things stand
 
-*Updated end of Day 10. Read this first; the entries below are the detail.*
+*Updated end of Day 11. Read this first; the entries below are the detail.*
 
 | | |
 |---|---|
 | **Phase** | Phase 1 (foundation) in progress. **Phase 0 not yet run** |
-| **Sessions logged** | 11 (Day 0–10) |
+| **Sessions logged** | 12 (Day 0–11) |
 | **Plan** | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — 161 sessions, 17 locked decisions |
-| **Next action** | Slice 1: implement `store/mysql` for `UserRepository` + `SessionRepository`, then wire `POST /api/auth/login`. **Phase 1 proper is blocked on Phase 0** |
+| **Next action** | Slice 1 UI: wire the React login form to `POST /api/auth/login` and drive nav from the real `/api/auth/me`. **Phase 1 proper is blocked on Phase 0** |
 
 **Green — verified and repeatable**
 
@@ -38,8 +38,13 @@ Newest entry first.
   failure does not fail login, unknown user indistinguishable, repo errors propagate.
 - **Migration 0003** (`password_bcrypt` + username index) verified on MySQL 8.4, down included.
 - **Migration 0004** (`tbl_session`) verified: unique token hash, FK guard, ON DELETE CASCADE.
-- **`auth.SessionService`** — 33 tests in the package; idle + absolute timeouts, throttled
-  touch, idempotent revoke, immediate `RevokeAllForUser`.
+- **`auth.SessionService`** — idle + absolute timeouts, throttled touch, idempotent revoke,
+  immediate `RevokeAllForUser`.
+- **`store/mysql`** — 12 integration tests against real MySQL: Chinese round-trip, NULL
+  handling, atomic upgrade advancing `row_version`, unknown permission levels denying,
+  Shanghai wall-clock `DATETIME` round-trip.
+- **Working end-to-end login** — `POST /api/auth/login` → HttpOnly cookie → `GET /api/auth/me`
+  → menu filtered by real permissions. `POST /api/auth/logout` revokes server-side.
 - 49 permission keys match legacy `FrmMDIMain` exactly.
 - **CI** (`.github/workflows/ci.yml`) — 3 jobs, all 9 steps verified locally.
 
@@ -95,6 +100,95 @@ Newest entry first.
 **Next action**
 -
 ```
+
+---
+
+## Day 11 — 2026-08-01 — store/mysql + working login (slice 1)
+
+First genuinely working authentication: login issues a session, `/me` resolves it, logout
+kills it, and the menu is filtered by real permissions from `tbl_permission`.
+
+**Done**
+
+- `internal/store/mysql` — `Open` (charset-verified), `UserRepo`, `SessionRepo`.
+- `internal/http` — `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`
+  behind `requireAuth`, plus `requirePermission` for future routes.
+- `cmd/carsaleman` wires it all when a DSN is present.
+- CI runs the store integration tests against the MySQL service container.
+
+**Verified**
+
+```
+go test -race ./...                     all packages pass
+store integration (real MySQL 8.4)      12/12
+http                                    all pass
+gofmt / vet / web build / encoding / catalogues   PASS
+```
+
+**Three bugs found, one of them real**
+
+1. **`defer s.clearSessionCookie(w)` in logout never cleared the cookie.** The deferred
+   call runs *after* `WriteHeader` has flushed the headers, and `http.SetCookie` is
+   silently a no-op at that point — no error, no warning. Logout appeared to work while
+   leaving the cookie in place. Now: revoke, set the cookie, *then* write the status.
+
+   Worth noting the server-side revoke was always correct, so this was a tidiness bug
+   rather than a security hole — but only because revocation does the real work. On a JWT
+   design the same mistake would have been a genuine failure to log out, which is a small
+   argument in favour of D17 that I had not anticipated.
+
+2. **`requireAuth` panicked on a nil service.** With no DSN configured, every authenticated
+   route dereferenced nil and the recover middleware turned it into a generic 500. My own
+   comment claimed it would "fail loudly" — an unhandled panic is not a good loud failure.
+   Now returns `503 SERVICE_UNAVAILABLE`, which tells an operator it is a missing DSN
+   rather than a bug.
+
+3. Two `/me` tests were asserting 401 against a server with no services wired, which is
+   really the 503 case. Split into a proper unconfigured-server test plus auth tests on a
+   fully wired server.
+
+**Decisions inside the implementation**
+
+- **`FindByUsername` uses `ORDER BY uid LIMIT 1`.** The username index is deliberately
+  non-unique (0003) because the legacy data has never been constrained. Duplicates must
+  resolve deterministically rather than failing someone's login.
+- **`UpgradePassword` omits the `row_version` guard.** It is an idempotent credential
+  upgrade triggered by a successful login, not a user edit — two concurrent logins both
+  write a valid hash for the same password, and returning 409 to one would be worse than
+  last-write-wins.
+- **`LoadPermissions` returns an empty set, never nil.** A nil map invites being read as
+  "unrestricted".
+- **`Open` verifies the connection charset** rather than trusting the DSN. Getting this
+  wrong is silent: 4-byte characters are mangled with no error.
+- **`loc=Asia/Shanghai`, not UTC.** I had written UTC first. Every legacy `DATETIME` was
+  written by a Windows client in Chinese local time, so reading them as UTC would shift
+  every migrated date by 8 hours and break report equivalence (§9) — the acceptance
+  criterion for the whole port. Pinned by a round-trip test.
+- **`SameSite=Lax`, not Strict.** Strict drops the cookie when a user arrives via an
+  external link, logging them out for no gain here; Lax still blocks the cross-site POST
+  CSRF depends on.
+
+**Test-time note**
+
+The HTTP package built a bcrypt hash per test at production cost (12), which took 107s.
+Now uses a precomputed cost-4 hash: 31s. `auth.TestHashPasswordUsesProductionCost` still
+guards the real constant. Cross-package cost control is awkward because `hashCost` is
+unexported — acceptable now, worth revisiting if more packages need it.
+
+**Half-finished**
+
+- The React app still calls `/api/auth/me` directly on load and has no login submission —
+  the UI has not caught up with the API.
+- `requirePermission` exists but no route uses it yet; the first will be a real CRUD slice.
+
+**Blocked**
+
+- **Phase 0 day 1** — export against `csm` on `R-SEVEN64`.
+
+**Next action**
+
+Wire the React login form to `POST /api/auth/login`, handle 401 by showing the form, and
+drive nav from the real `/api/auth/me`.
 
 ---
 

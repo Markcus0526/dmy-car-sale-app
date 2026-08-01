@@ -21,6 +21,10 @@ func (f *fakeRepo) FindByUsername(context.Context, string) (*User, error) {
 	return f.user, f.findErr
 }
 
+func (f *fakeRepo) FindByID(context.Context, int64) (*User, error) {
+	return f.user, f.findErr
+}
+
 func (f *fakeRepo) UpgradePassword(_ context.Context, _ int64, hash string) error {
 	if f.upgradeErr != nil {
 		return f.upgradeErr

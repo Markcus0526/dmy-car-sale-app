@@ -68,6 +68,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
       # --default-character-set=utf8mb4 is not optional. Without it the client
       # connection can negotiate a narrower charset and 4-byte characters are
       # silently mangled on the way in -- which is exactly the failure mode
@@ -215,3 +220,12 @@ jobs:
             git diff -- docs/i18n/zh-CN.extracted.json
             exit 1
           fi
+
+      # The repository layer against a real MySQL. These are the checks a fake
+      # cannot make: charset negotiation, NULL handling, DATETIME round-trips
+      # and constraint behaviour. Without the DSN they skip silently, so the
+      # variable is what makes them run at all.
+      - name: Store integration tests
+        env:
+          CARSALEMAN_TEST_DSN: root:test@tcp(127.0.0.1:3306)/csm
+        run: go test -race ./internal/store/mysql/ -v

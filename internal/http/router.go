@@ -17,12 +17,18 @@ import (
 )
 
 type Server struct {
-	cfg config.Config
-	log *slog.Logger
+	cfg      config.Config
+	log      *slog.Logger
+	auth     *auth.Service
+	sessions *auth.SessionService
 }
 
-func NewServer(cfg config.Config, log *slog.Logger) *Server {
-	return &Server{cfg: cfg, log: log}
+// NewServer wires the HTTP layer.
+//
+// auth and sessions may be nil in tests that only exercise unauthenticated
+// routes; every handler that needs them sits behind requireAuth.
+func NewServer(cfg config.Config, log *slog.Logger, authSvc *auth.Service, sessions *auth.SessionService) *Server {
+	return &Server{cfg: cfg, log: log, auth: authSvc, sessions: sessions}
 }
 
 // Handler returns the fully wired root handler.
@@ -30,7 +36,14 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/health", s.handleHealth)
-	mux.HandleFunc("GET /api/auth/me", s.handleMe)
+
+	// Unauthenticated.
+	mux.HandleFunc("POST /api/auth/login", s.handleLogin)
+	mux.HandleFunc("POST /api/auth/logout", s.handleLogout)
+
+	// Authenticated. Every route beyond this point carries a real session;
+	// nav gating on the client is convenience, this is the boundary (§10.8).
+	mux.Handle("GET /api/auth/me", s.requireAuth(http.HandlerFunc(s.handleMe)))
 
 	// Catch-all. Without it, unmatched routes fall through to the stdlib's
 	// "404 page not found" plaintext, the client's JSON parse fails, and every
@@ -74,26 +87,21 @@ type meResponse struct {
 
 // handleMe returns the current user, permissions and filtered menu.
 //
-// STUB: until slice 1 (auth) lands there is no session and no tbl_userinfo,
-// so this grants every permission at 读写 in dev. It exists to prove the
-// permission-key/label-key separation end to end.
+// Sits behind requireAuth, so the context always carries a caller.
 func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
-	perms := auth.Set{}
-	for _, key := range allPermissionKeys() {
-		perms[key] = auth.LevelReadWrite
+	a, ok := UserFrom(r.Context())
+	if !ok {
+		apierr.Write(w, apierr.CodeUnauthorized, RequestIDFrom(r.Context()), nil)
+		return
 	}
 
-	out := make(map[string]string, len(perms))
-	for k, v := range perms {
-		out[k] = string(v)
+	user, err := s.auth.UserByID(r.Context(), a.UserID)
+	if err != nil {
+		s.log.Error("loading user failed", "err", err, "request_id", RequestIDFrom(r.Context()))
+		apierr.Write(w, apierr.CodeInternal, RequestIDFrom(r.Context()), nil)
+		return
 	}
-
-	writeJSON(w, http.StatusOK, meResponse{
-		Username:    "dev",
-		DisplayName: "Developer",
-		Permissions: out,
-		Menu:        filterMenu(menuTree, perms),
-	})
+	writeJSON(w, http.StatusOK, s.meBody(user, a.Permissions))
 }
 
 // allPermissionKeys walks the menu tree collecting every permission key.
