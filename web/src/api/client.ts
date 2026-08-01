@@ -98,3 +98,30 @@ export interface MeResponse {
 export function fetchMe(): Promise<MeResponse> {
   return apiFetch<MeResponse>("/api/auth/me");
 }
+
+/**
+ * Log in. The session token comes back as an HttpOnly cookie, which this code
+ * deliberately cannot read (D17) — the browser attaches it to later requests
+ * because every call sets `credentials: "include"`.
+ */
+export function login(username: string, password: string): Promise<MeResponse> {
+  return apiFetch<MeResponse>("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ username, password }),
+  });
+}
+
+/**
+ * Log out.
+ *
+ * Never rejects: a user who clicked "sign out" must end up signed out in the
+ * UI even if the request failed. The server-side revoke is what actually ends
+ * the session, and it is retried implicitly by the session expiring.
+ */
+export async function logout(): Promise<void> {
+  try {
+    await apiFetch<void>("/api/auth/logout", { method: "POST" });
+  } catch {
+    /* deliberately ignored — see above */
+  }
+}

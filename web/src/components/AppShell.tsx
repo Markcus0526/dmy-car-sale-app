@@ -53,7 +53,12 @@ function MenuSection({ node }: { node: MenuNode }) {
   );
 }
 
-export default function AppShell({ me }: { me: MeResponse }) {
+interface AppShellProps {
+  me: MeResponse;
+  onLogout: () => void;
+}
+
+export default function AppShell({ me, onLogout }: AppShellProps) {
   const { t } = useTranslation();
   const routes = leaves(me.menu);
   const first = routes[0];
@@ -80,7 +85,12 @@ export default function AppShell({ me }: { me: MeResponse }) {
             <span className="shell__userLabel">{t("nav.signedInAs")}</span>
             <strong>{me.displayName}</strong>
           </div>
-          <LanguageSwitcher />
+          <div className="shell__actions">
+            <LanguageSwitcher />
+            <button className="btn btn--subtle" onClick={onLogout}>
+              {t("common.signOut")}
+            </button>
+          </div>
         </header>
 
         <main className="shell__content">
