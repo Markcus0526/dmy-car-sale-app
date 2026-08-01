@@ -230,7 +230,7 @@ lines; that number is a guess until day 1 completes.
 | 6–7 | `migrations/0001_init.up.sql` from reconciled DDL. **Decide `row_version` (§11.4) and the Chinese collation strategy (§5.4)** — both change every table's DDL |
 | 8–11 | `cmd/migrate-data`: table-by-table with per-table row counts, decimal sum checksums, and an orphan report per FK. Load order per §8 Phase 1.4 |
 | 12 | Run against a production copy. Resolve orphans |
-| 13 | CI: build, `go vet`, `-race` tests, MySQL service container, `golangci-lint` |
+| 13 | Local check script (`./scripts/check.sh`, `--db` for the MySQL checks). GitHub Actions removed by request — nothing gates a push, so run this before committing |
 | 14–15 | `internal/platform`: config, structured logging with a **non-recursive** fallback (fixes §10.4), errors, decimal helpers |
 | 16–18 | Draft `locales/en.json` from `zh-CN.json`. Day 18 is a glossary pass on domain terms — send for native review, which can proceed asynchronously |
 

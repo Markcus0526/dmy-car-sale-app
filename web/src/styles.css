@@ -6,6 +6,7 @@
   --muted: #667085;
   --accent: #1f5fa9;
   --accent-soft: #e8f0fa;
+  --danger: #b42318;
   --radius: 6px;
   --sidebar-w: 264px;
 }
@@ -76,6 +77,33 @@ body {
   outline: 2px solid var(--accent-soft);
   border-color: var(--accent);
 }
+.field__input:disabled { background: #f4f5f7; color: var(--muted); }
+
+.field__input--invalid { border-color: var(--danger); }
+.field__error {
+  display: block;
+  margin-top: 4px;
+  color: var(--danger);
+  font-size: 12px;
+}
+
+.alert {
+  margin-bottom: 16px;
+  padding: 9px 12px;
+  border: 1px solid #f0c2c2;
+  border-radius: var(--radius);
+  background: #fdf2f2;
+  color: #8a2020;
+  font-size: 13px;
+}
+
+.btn--subtle {
+  padding: 5px 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.btn--subtle:hover { color: var(--text); }
+.btn:disabled { opacity: 0.6; cursor: default; }
 
 /* ---------- login ---------- */
 
@@ -145,6 +173,7 @@ body {
   border-bottom: 1px solid var(--border);
 }
 .shell__user { display: flex; align-items: baseline; gap: 8px; }
+.shell__actions { display: flex; align-items: center; gap: 14px; }
 .shell__userLabel { color: var(--muted); font-size: 13px; }
 .shell__content { flex: 1; overflow: auto; padding: 24px; }
 

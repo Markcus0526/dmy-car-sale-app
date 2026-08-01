@@ -10,14 +10,14 @@ Newest entry first.
 
 ## Where things stand
 
-*Updated end of Day 11. Read this first; the entries below are the detail.*
+*Updated end of Day 12. Read this first; the entries below are the detail.*
 
 | | |
 |---|---|
 | **Phase** | Phase 1 (foundation) in progress. **Phase 0 not yet run** |
-| **Sessions logged** | 12 (Day 0–11) |
+| **Sessions logged** | 13 (Day 0–12) |
 | **Plan** | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — 161 sessions, 17 locked decisions |
-| **Next action** | Slice 1 UI: wire the React login form to `POST /api/auth/login` and drive nav from the real `/api/auth/me`. **Phase 1 proper is blocked on Phase 0** |
+| **Next action** | Slice 1 is functionally complete. Next is slice 2 (reference data) or slice 3 (shared filter+grid, which gates 4–8). **Phase 1 proper is blocked on Phase 0** |
 
 **Green — verified and repeatable**
 
@@ -46,7 +46,9 @@ Newest entry first.
 - **Working end-to-end login** — `POST /api/auth/login` → HttpOnly cookie → `GET /api/auth/me`
   → menu filtered by real permissions. `POST /api/auth/logout` revokes server-side.
 - 49 permission keys match legacy `FrmMDIMain` exactly.
-- **CI** (`.github/workflows/ci.yml`) — 3 jobs, all 9 steps verified locally.
+- **`./scripts/check.sh`** — every check in one command; `--db` adds the MySQL migration and
+  integration checks. **No CI**: GitHub Actions was removed by request, so nothing runs
+  automatically. Run this before committing.
 
 **Amber — known debt, carried deliberately**
 
@@ -100,6 +102,75 @@ Newest entry first.
 **Next action**
 -
 ```
+
+---
+
+## Day 12 — 2026-08-01 — Login UI, and CI replaced by a local script
+
+**Done**
+
+- React login wired to the real API: `POST /api/auth/login`, session cookie, `GET /api/auth/me`,
+  sign-out.
+- **GitHub Actions removed by request.** Replaced with `./scripts/check.sh`.
+
+**The script immediately caught a bug the workflow never could**
+
+`0001_init.down.sql` left one table behind. `tbl_session` belongs to **0004**, and each
+down file undoes only its own migration — so rolling back requires reverse order
+(0004 → 0003 → 0002 → 0001), which is what `golang-migrate` does.
+
+Both my check *and* the deleted workflow made the same wrong assumption: that 0001's down
+undoes everything. **The workflow would have failed on its first real run** — it never ran,
+because nothing was ever pushed. Removing CI in favour of a script I actually execute
+surfaced this within minutes.
+
+**And a second one underneath it**
+
+`0002_foreign_keys.down.sql` was a `TODO` that did nothing. A rollback would have reported
+success while leaving every foreign key in place. It is now generated from 0002's own
+`ALTER TABLE` statements, reversed, so the pair cannot drift.
+
+A down migration that silently no-ops is worse than an absent one: absence is visible,
+a no-op looks like success.
+
+**Verified**
+
+```
+./scripts/check.sh --db
+  Go        gofmt build vet test-race        PASS
+  Web       typecheck build                  PASS
+  i18n      encoding, both catalogues, reproducible   PASS
+  Migrations 16 tables, row_version 15, 6 FKs, bcrypt(60),
+             non-unique username idx, full rollback 0, re-apply 16,
+             4 behavioural assertions        PASS
+  Store     integration vs MySQL 8.4         PASS
+```
+
+**Frontend design points**
+
+- `logout()` never rejects: a user who clicked sign out must end up signed out in the UI
+  even if the request failed. The server-side revoke is what actually ends the session.
+- On load the app resolves an existing cookie; **401 is the normal "not signed in" answer**,
+  not an error screen. Anything else gets a retry.
+- Login errors stay inside the form rather than replacing the screen — a wrong password
+  should not discard what was typed.
+- The 编码 (code) field is kept because users recognise the form, but it is not sent:
+  `FrmLogon.cs:71-76` authenticates on username + password only.
+
+**Consequence of removing CI — worth being clear about**
+
+Nothing gates a push now. The checks are all still there and all still pass, but they only
+run when someone runs them. `./scripts/check.sh` before committing is now a discipline
+rather than a guarantee, in the same way the session log is.
+
+**Blocked**
+
+- **Phase 0 day 1** — export against `csm` on `R-SEVEN64`.
+
+**Next action**
+
+Slice 1 is functionally complete. Either slice 2 (reference data) or slice 3 (shared query
+filter + grid) — slice 3 gates slices 4–8, so it is the higher-leverage choice.
 
 ---
 

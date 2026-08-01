@@ -154,9 +154,26 @@ const fkUp = `${banner}
 ${foreignKeys.length ? foreignKeys.join("\n") : "-- TODO(phase0): no FK statements found in the schema file"}
 `;
 
+// Derived from the ALTER TABLE statements above, so the two files cannot drift.
+const fkDropStatements = foreignKeys
+  .map((stmt) => {
+    const table = stmt.match(/ALTER TABLE `(\w+)`/)?.[1];
+    const name = stmt.match(/ADD CONSTRAINT `(\w+)`/)?.[1];
+    return table && name
+      ? `ALTER TABLE \`${table}\` DROP FOREIGN KEY \`${name}\`;`
+      : null;
+  })
+  .filter(Boolean)
+  .reverse(); // mirror image of the up file
+
 const fkDown = `${banner}
--- TODO(phase0): drop the constraints added by 0002. Constraint names come from
--- the ALTER TABLE statements in docs/mysql/schema.sql section 2.
+-- Drops the constraints added by 0002, in reverse order.
+--
+-- Generated from 0002's own ALTER TABLE statements, so the pair cannot drift.
+-- A down migration that silently does nothing is worse than none: a rollback
+-- appears to succeed while leaving the schema constrained.
+
+${fkDropStatements.length ? fkDropStatements.join("\n") : "-- no foreign keys to drop"}
 `;
 
 fs.mkdirSync(OUT, { recursive: true });
