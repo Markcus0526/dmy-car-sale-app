@@ -10,14 +10,14 @@ Newest entry first.
 
 ## Where things stand
 
-*Updated end of Day 12. Read this first; the entries below are the detail.*
+*Updated end of Day 13. Read this first; the entries below are the detail.*
 
 | | |
 |---|---|
 | **Phase** | Phase 1 (foundation) in progress. **Phase 0 not yet run** |
-| **Sessions logged** | 13 (Day 0–12) |
+| **Sessions logged** | 14 (Day 0–13) |
 | **Plan** | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — 161 sessions, 17 locked decisions |
-| **Next action** | Slice 1 is functionally complete. Next is slice 2 (reference data) or slice 3 (shared filter+grid, which gates 4–8). **Phase 1 proper is blocked on Phase 0** |
+| **Next action** | Slice 3 continues: the reusable React grid + filter UI on top of `internal/query`. **Phase 1 proper is blocked on Phase 0** |
 
 **Green — verified and repeatable**
 
@@ -46,6 +46,8 @@ Newest entry first.
 - **Working end-to-end login** — `POST /api/auth/login` → HttpOnly cookie → `GET /api/auth/me`
   → menu filtered by real permissions. `POST /api/auth/logout` revokes server-side.
 - 49 permission keys match legacy `FrmMDIMain` exactly.
+- **`internal/query`** — parameterised filter builder replacing `FrmSearch`; 16 tests,
+  LIKE escaping verified against real MySQL.
 - **`./scripts/check.sh`** — every check in one command; `--db` adds the MySQL migration and
   integration checks. **No CI**: GitHub Actions was removed by request, so nothing runs
   automatically. Run this before committing.
@@ -102,6 +104,89 @@ Newest entry first.
 **Next action**
 -
 ```
+
+---
+
+## Day 13 — 2026-08-01 — Shared query filter (slice 3, §2.6)
+
+Slice 3 gates slices 4–8, so it is the highest-leverage remaining work.
+
+**What the legacy actually does — worth reading the code for**
+
+`FrmSearch` was not a general expression builder. The user picks up to three text
+columns and one date column **by clicking grid headers**, and the column's underlying
+name lands in `keyField1..4` — 52 assignments across 11 forms, every one of the shape
+`frmSearch.keyField1 = grid.Cols[c].Name`. It then concatenates:
+
+```
+keyField1 LIKE '%typed%' AND keyField2 LIKE '%typed%' AND …
+AND keyField4 >= 'start' AND keyField4 <= 'end'
+```
+
+That block is **copy-pasted eleven times**, once per `searchKind`, differing only in which
+form it calls back into.
+
+**Why that shape matters for security**
+
+The field name comes from the client and **a column name cannot be a bind parameter**. So
+it is the one part of a filter that must be *validated*, not escaped. `query.Fields` is a
+per-resource allowlist mapping API field name → SQL column; anything not in it is rejected.
+The indirection also keeps internal names internal — `vw_storeout.Expr1` is exactly the
+sort of thing that should never be nameable from outside.
+
+Values are always bound. §10.6 notes the legacy targeted `DataTable.Select` rather than the
+database, so it was expression injection rather than SQL injection — but the port issues
+real SQL, where the same shape is not survivable.
+
+**Two deliberate departures from legacy behaviour**
+
+1. **LIKE metacharacters are escaped.** The legacy interpolated raw input into `'%value%'`,
+   so a user typing `%` silently matched everything and `_` matched any character. Nobody
+   could have been relying on that — it is neither documented nor discoverable — and a
+   search box is understood to match literal text.
+
+   Verified against MySQL rather than assumed:
+   `LIKE '%a\_b%' ESCAPE '\\'` matches `a_b` but not `axb`; unescaped `LIKE '%a_b%'`
+   matches both.
+
+2. **An inclusive date upper bound covers the whole day.** `<= '2026-08-01'` against a
+   `DATETIME` otherwise excludes everything after midnight — the classic off-by-a-day that
+   in a sales report is a wrong *number*, not a wrong screen. Dates parse in
+   `Asia/Shanghai` for the same reason the driver does.
+
+**Verified**
+
+```
+go test -race ./internal/query/   16/16
+LIKE escaping                     confirmed against MySQL 8.4, with a control
+./scripts/check.sh                ALL PASS
+```
+
+**Three test bugs of my own, all the same shape**
+
+Each time the code was right and the assertion was wrong:
+
+- asserted the SQL contained no `'`, but `ESCAPE '\'` is *ours*;
+- asserted the bound arg equalled the raw input, but it is correctly LIKE-escaped.
+
+Both were me testing the implementation's incidentals rather than the property I cared
+about. The fixed versions state the property: no fragment of the user's value appears in
+the SQL text, and exactly one placeholder is emitted.
+
+**Half-finished**
+
+- No repository uses `query.Build` yet — the first will be slice 4 (on-road vehicles).
+- No `Fields` allowlists are declared yet; each belongs next to the repository that owns it.
+- The React grid and filter UI do not exist. That is the rest of slice 3.
+
+**Blocked**
+
+- **Phase 0 day 1** — export against `csm` on `R-SEVEN64`.
+
+**Next action**
+
+Build the reusable React data grid with the filter UI on top of `internal/query`'s shape,
+then wire the first list endpoint through it.
 
 ---
 
