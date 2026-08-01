@@ -12,6 +12,7 @@ import (
 	"net/http"
 
 	"github.com/Markcus0526/carsaleman/internal/auth"
+	"github.com/Markcus0526/carsaleman/internal/http/apierr"
 	"github.com/Markcus0526/carsaleman/internal/platform/config"
 )
 
@@ -31,6 +32,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/health", s.handleHealth)
 	mux.HandleFunc("GET /api/auth/me", s.handleMe)
 
+	// Catch-all. Without it, unmatched routes fall through to the stdlib's
+	// "404 page not found" plaintext, the client's JSON parse fails, and every
+	// wrong URL surfaces as error.UNKNOWN instead of error.NOT_FOUND. The
+	// code-not-prose contract has to hold for misses too, not just for hits.
+	mux.HandleFunc("/", s.handleNotFound)
+
 	return chain(mux,
 		requestID,
 		recoverPanic(s.log),
@@ -47,6 +54,10 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (s *Server) handleNotFound(w http.ResponseWriter, r *http.Request) {
+	apierr.Write(w, apierr.CodeNotFound, RequestIDFrom(r.Context()), nil)
 }
 
 // meResponse drives client-side nav gating.

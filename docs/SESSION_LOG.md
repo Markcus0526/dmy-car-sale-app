@@ -10,32 +10,37 @@ Newest entry first.
 
 ## Where things stand
 
-*Updated end of Day 4. Read this first; the entries below are the detail.*
+*Updated end of Day 6. Read this first; the entries below are the detail.*
 
 | | |
 |---|---|
 | **Phase** | Phase 1 (foundation) in progress. **Phase 0 not yet run** |
-| **Sessions logged** | 5 (Day 0–4) |
+| **Sessions logged** | 7 (Day 0–6) |
 | **Plan** | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — 161 sessions, 14 locked decisions |
-| **Next action** | Wire `verify.mjs` into CI so catalogue drift fails the build |
+| **Next action** | Plan days 6–7: draft `migrations/0001_init.up.sql` skeleton from `docs/mysql/schema.sql`, marking every field Phase 0 must confirm |
 
 **Green — verified and repeatable**
 
+- **Go backend compiles, vets and tests clean under `-race`.** Go 1.26.5 installed to the
+  scratchpad (no sudo needed): `export PATH="$SP/go/bin:$PATH"`.
 - `web/` builds under strict TS; dev server serves; app catalogue 90/90.
-- String extraction: 1,154 literals → 1,023 TRANSLATE (370 keys) / 86 NEVER / 45 DROP /
-  **0 REVIEW**. Re-runnable: `node tools/extract-strings/extract.mjs`.
-- English catalogue: 370/370 translated, `verify.mjs` exit=0 on both catalogues.
+- String extraction: 1,447 literals → 1,316 TRANSLATE (**472 keys**) / 86 NEVER / 45 DROP /
+  **0 REVIEW**. Covers `.cs` literals *and* `.resx` grid captions.
+  Re-runnable: `node tools/extract-strings/extract.mjs`.
+- English catalogue: **472/472** translated, `verify.mjs` exit=0 on both catalogues.
+- Encoding conversion lossless: 201 files, 5,435 CJK codepoints, 0 failures.
+  `node tools/convert-encoding/convert.mjs` (add `--check` to verify only).
 - 49 permission keys match legacy `FrmMDIMain` exactly.
+- **CI** (`.github/workflows/ci.yml`) — 3 jobs, all 9 steps verified locally.
 
 **Amber — known debt, carried deliberately**
 
-- **The Go backend has never been compiled** (3 sessions running). No Go toolchain on the
-  dev machine. ~600 lines carrying real decisions — the permission enum, the error-code
-  envelope — all unverified. *Install Go and this clears in one session.*
 - The 370-key extracted catalogue is reference material; it merges into
   `web/src/locales/` per-slice as screens are built, not in bulk.
 - 8 concatenation call sites need merging into interpolated keys at port time
   (`docs/i18n/CONCATENATIONS.md`) — affects 6 of the 11 reports.
+- Go is installed to the **scratchpad**, which is session-scoped. CI has its own
+  toolchain, so this only affects local runs — re-extract if it disappears.
 
 **Red — blocked on someone else**
 
@@ -80,6 +85,149 @@ Newest entry first.
 **Next action**
 -
 ```
+
+---
+
+## Day 6 — 2026-08-01 — UTF-8 reference tree (plan day 4)
+
+**Done**
+
+- `tools/convert-encoding/convert.mjs` — per-file encoding detection, lossless conversion
+  to `reference/` (gitignored; regenerates in under a second). Original tree untouched.
+- Extractor extended to scan `.resx` grid captions.
+- Catalogue **370 → 472 keys**, all translated.
+- `GO_MIGRATION_PLAN.md` §11.7 rewritten — for the second time, see below.
+
+**Verified**
+
+```
+conversion   201 files   5,435 CJK codepoints   0 failures
+             decoded original === converted file, exactly
+             original tree: 0 modified files
+catalogue    472/472      verify exit=0
+CI (local)   Go PASS   Web PASS   i18n PASS (incl. new --check step)
+```
+
+**Correction — and this one was mine to begin with**
+
+Day 1 recorded that `.resx` files contain zero Chinese. That was measured with the
+byte-range grep I later proved unreliable, and it was wrong. Being able to plain-grep the
+UTF-8 tree exposed it within a minute:
+
+> **27 of 63 `.resx` files embed a serialized C1FlexGrid `ColumnInfo` blob containing 144
+> Chinese column captions — 116 of which appear nowhere in the `.cs` sources.**
+
+These are the column headers on **every list screen**. Without them each grid would have
+rendered Chinese headers inside an English UI — a whole category of missing translation,
+invisible until someone opened a grid.
+
+The `Name` field inside the blob gives a far better key stem than anything derived from
+caption text: `common.col_inprice` rather than a slug.
+
+Worth drawing the lesson out: the reference tree paid for itself immediately, and not for
+the reason it was scheduled. It was planned as a *readability* aid for porting; it earned
+its keep as an *auditing* aid, by making a bad measurement obvious.
+
+**Key stability — a real weakness, caught by the verifier**
+
+Adding a new source shifted value frequencies, so 18 values were promoted to `common.col_*`
+keys and their previous keys were orphaned. `verify.mjs` reported `missing: 0, extra: 18` —
+no translation lost, 18 stale keys pruned.
+
+Keys are **not stable** across extractor changes. That is acceptable while the catalogue is
+reference material, but once keys are referenced from `web/src/locales/` a rename becomes a
+breaking change. The verifier is what makes this safe; do not weaken it.
+
+**Also noted**
+
+- The finance grid columns confirm §6.1's computed fields by name — `距离展期天数`,
+  `距离免息天数`, `累计利息`, `货款金额`, `货款余额`, `全额还款到期日期`. Independent
+  corroboration of the interest engine's outputs, from the UI side.
+- More legacy typos, and the `.resx` sometimes has it *right* where the `.cs` has it wrong:
+  `.resx` says `发动机前码` (correct 码) while the `.cs` label says `发动机前吗`.
+  Also new: `转库日其` (should be 期).
+
+**Blocked**
+
+- **Phase 0 day 1** — export against `csm` on `R-SEVEN64`. Still the only external blocker.
+
+**Next action**
+
+Plan days 6–7: draft `migrations/0001_init.up.sql` from `docs/mysql/schema.sql`, explicitly
+marking every field Phase 0 must confirm (defaults, indexes, checks, collation) so the gaps
+are visible rather than silently guessed.
+
+---
+
+## Day 5 — 2026-08-01 — Go verified + CI (plan day 13)
+
+Cleared the three-session "never compiled" debt first, because CI needs a working Go build
+anyway and shipping an unvalidated workflow would have been the same mistake twice.
+
+**Done**
+
+- Installed **Go 1.26.5** locally — extracted to the scratchpad, **no sudo required**.
+- Compiled, vetted, gofmt'd and **tested** the backend for the first time.
+- Added test coverage: `internal/auth`, `internal/http` (menu + router),
+  `internal/platform/config`.
+- Wrote `.github/workflows/ci.yml` — three jobs: Go, Web, i18n.
+
+**Verified — every CI step run locally before committing the workflow**
+
+```
+Go     gofmt  PASS   build  PASS   vet  PASS   test -race  PASS
+Web    typecheck  PASS   build  PASS
+i18n   app catalogue  PASS   extracted catalogue  PASS   reproducible  PASS
+```
+
+Server exercised end to end on :18080 — `/api/health` 200,
+`/api/auth/me` returns 48 permissions across 7 menu sections with the
+`permissionKey` / `labelKey` separation intact on the wire.
+
+**Bug found by running it, not by reading it**
+
+`GET /api/nope` returned Go's stdlib `404 page not found` **as plaintext**. The client
+parses JSON to read the error code, so a plaintext body made `res.json()` throw and
+degraded *every* unmatched route to `error.UNKNOWN` instead of `error.NOT_FOUND`.
+
+The code-not-prose contract has to hold for misses as well as hits. Fixed with a catch-all
+route returning the standard envelope; pinned by `TestNotFoundReturnsErrorCodeNotProse`.
+
+Worth noting the compiler had nothing to say about this. It compiled, vetted and gofmt'd
+clean for three sessions with the bug present — only running it surfaced it.
+
+**Tests worth calling out**
+
+- `TestSetDenyByDefault` — an absent permission key grants neither read nor write (§9's
+  deny-by-default requirement, previously untested).
+- `TestFilterMenuDropsChildlessParents` — a section whose children are all denied
+  disappears, rather than expanding onto nothing.
+- `TestMenuKeysAreDistinctInKind` — `LabelKey` must be ASCII under `menu.`, `PermissionKey`
+  must not equal it. Fails loudly if anyone ever swaps the two.
+- `TestProdRequiresDSN` — prod without a DSN refuses to start. A security test, not a
+  config test: the legacy app shipped the `sa` password to every workstation.
+
+**CI design note**
+
+The i18n job re-runs the extractor and fails on a diff. That catches two different things
+with one check: the legacy C# source changed, or someone hand-edited generated output.
+Both need a human; neither should reach a screen silently.
+
+**Half-finished**
+
+- Go lives in the **scratchpad**, which is session-scoped. CI is unaffected (it provisions
+  its own), but a future local session may need to re-extract it.
+- CI has **not run on GitHub yet** — validated locally only. First push to `develop` will
+  be the real test.
+
+**Blocked**
+
+- **Phase 0 day 1** — export against `csm` on `R-SEVEN64`. Still the only external blocker.
+
+**Next action**
+
+Plan day 4: convert the 130 C# sources to UTF-8 into a reference tree, detecting encoding
+per file (84 GB18030 / 39 UTF-8-BOM / 7 UTF-8).
 
 ---
 

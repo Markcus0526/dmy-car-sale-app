@@ -853,9 +853,22 @@ the 64 `.resx` files. **Both were wrong.** Measured against the source:
 
 | Claim | Reality |
 |---|---|
-| All files GB18030 | **Mixed.** Some GB18030, some UTF-8-with-BOM. The converter must detect per file, not assume |
-| UI strings in 64 `.resx` | **Zero** Chinese in any `.resx`. They hold only bitmaps (263), icons (102), colors (63), byte arrays (64) |
-| — | UI strings are **hardcoded in `.cs` / `.Designer.cs`**: 1,156 quoted literals containing Chinese, across **123 of 130** files, on 1,140 lines |
+| All files GB18030 | **Mixed — three encodings.** Across 201 source files: GB18030 84, UTF-8-with-BOM 64, plain UTF-8 53. Detect per file; a blanket `iconv -f GB18030` mojibakes the 117 that are already UTF-8 |
+| UI strings in 64 `.resx` | **Partly true, and the first correction of this section was itself wrong.** The `.resx` files hold no ordinary *string resources* — only bitmaps, icons, colors and byte arrays. But **27 of 63 embed a serialized C1FlexGrid `ColumnInfo` blob containing 144 Chinese column captions** |
+| — | The bulk of UI text is **hardcoded in `.cs` / `.Designer.cs`**: ~1,150 quoted literals containing Chinese, across 123 of 130 files |
+
+Both `.cs` literals and `.resx` `ColumnInfo` captions must be extracted. Missing the
+latter means every list screen renders Chinese column headers inside an English UI —
+144 captions, 116 of which appear nowhere in the `.cs` sources.
+
+The captions look like this inside the `<value>` blob:
+
+```
+Columns:0{Name:"vin";Caption:"VIN码";Visible:True}1{Name:"inprice";Caption:"进价"…}
+```
+
+The `Name` field is a good key stem — `common.col_inprice` beats anything derived from
+the caption text.
 
 Example, `FrmLogon.Designer.cs`:
 

@@ -48,3 +48,6 @@ Thumbs.db
 *.mov
 *.wmv
 
+
+# UTF-8 reference tree — regenerate with tools/convert-encoding/convert.mjs
+reference/
