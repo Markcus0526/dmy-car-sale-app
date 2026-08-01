@@ -10,32 +10,34 @@ Newest entry first.
 
 ## Where things stand
 
-*Updated end of Day 4. Read this first; the entries below are the detail.*
+*Updated end of Day 5. Read this first; the entries below are the detail.*
 
 | | |
 |---|---|
 | **Phase** | Phase 1 (foundation) in progress. **Phase 0 not yet run** |
-| **Sessions logged** | 5 (Day 0–4) |
+| **Sessions logged** | 6 (Day 0–5) |
 | **Plan** | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — 161 sessions, 14 locked decisions |
-| **Next action** | Wire `verify.mjs` into CI so catalogue drift fails the build |
+| **Next action** | Convert the 130 C# sources to UTF-8 into a reference tree (plan day 4) |
 
 **Green — verified and repeatable**
 
+- **Go backend compiles, vets and tests clean under `-race`.** Go 1.26.5 installed to the
+  scratchpad (no sudo needed): `export PATH="$SP/go/bin:$PATH"`.
 - `web/` builds under strict TS; dev server serves; app catalogue 90/90.
 - String extraction: 1,154 literals → 1,023 TRANSLATE (370 keys) / 86 NEVER / 45 DROP /
   **0 REVIEW**. Re-runnable: `node tools/extract-strings/extract.mjs`.
 - English catalogue: 370/370 translated, `verify.mjs` exit=0 on both catalogues.
 - 49 permission keys match legacy `FrmMDIMain` exactly.
+- **CI** (`.github/workflows/ci.yml`) — 3 jobs, all 9 steps verified locally.
 
 **Amber — known debt, carried deliberately**
 
-- **The Go backend has never been compiled** (3 sessions running). No Go toolchain on the
-  dev machine. ~600 lines carrying real decisions — the permission enum, the error-code
-  envelope — all unverified. *Install Go and this clears in one session.*
 - The 370-key extracted catalogue is reference material; it merges into
   `web/src/locales/` per-slice as screens are built, not in bulk.
 - 8 concatenation call sites need merging into interpolated keys at port time
   (`docs/i18n/CONCATENATIONS.md`) — affects 6 of the 11 reports.
+- Go is installed to the **scratchpad**, which is session-scoped. CI has its own
+  toolchain, so this only affects local runs — re-extract if it disappears.
 
 **Red — blocked on someone else**
 
@@ -80,6 +82,78 @@ Newest entry first.
 **Next action**
 -
 ```
+
+---
+
+## Day 5 — 2026-08-01 — Go verified + CI (plan day 13)
+
+Cleared the three-session "never compiled" debt first, because CI needs a working Go build
+anyway and shipping an unvalidated workflow would have been the same mistake twice.
+
+**Done**
+
+- Installed **Go 1.26.5** locally — extracted to the scratchpad, **no sudo required**.
+- Compiled, vetted, gofmt'd and **tested** the backend for the first time.
+- Added test coverage: `internal/auth`, `internal/http` (menu + router),
+  `internal/platform/config`.
+- Wrote `.github/workflows/ci.yml` — three jobs: Go, Web, i18n.
+
+**Verified — every CI step run locally before committing the workflow**
+
+```
+Go     gofmt  PASS   build  PASS   vet  PASS   test -race  PASS
+Web    typecheck  PASS   build  PASS
+i18n   app catalogue  PASS   extracted catalogue  PASS   reproducible  PASS
+```
+
+Server exercised end to end on :18080 — `/api/health` 200,
+`/api/auth/me` returns 48 permissions across 7 menu sections with the
+`permissionKey` / `labelKey` separation intact on the wire.
+
+**Bug found by running it, not by reading it**
+
+`GET /api/nope` returned Go's stdlib `404 page not found` **as plaintext**. The client
+parses JSON to read the error code, so a plaintext body made `res.json()` throw and
+degraded *every* unmatched route to `error.UNKNOWN` instead of `error.NOT_FOUND`.
+
+The code-not-prose contract has to hold for misses as well as hits. Fixed with a catch-all
+route returning the standard envelope; pinned by `TestNotFoundReturnsErrorCodeNotProse`.
+
+Worth noting the compiler had nothing to say about this. It compiled, vetted and gofmt'd
+clean for three sessions with the bug present — only running it surfaced it.
+
+**Tests worth calling out**
+
+- `TestSetDenyByDefault` — an absent permission key grants neither read nor write (§9's
+  deny-by-default requirement, previously untested).
+- `TestFilterMenuDropsChildlessParents` — a section whose children are all denied
+  disappears, rather than expanding onto nothing.
+- `TestMenuKeysAreDistinctInKind` — `LabelKey` must be ASCII under `menu.`, `PermissionKey`
+  must not equal it. Fails loudly if anyone ever swaps the two.
+- `TestProdRequiresDSN` — prod without a DSN refuses to start. A security test, not a
+  config test: the legacy app shipped the `sa` password to every workstation.
+
+**CI design note**
+
+The i18n job re-runs the extractor and fails on a diff. That catches two different things
+with one check: the legacy C# source changed, or someone hand-edited generated output.
+Both need a human; neither should reach a screen silently.
+
+**Half-finished**
+
+- Go lives in the **scratchpad**, which is session-scoped. CI is unaffected (it provisions
+  its own), but a future local session may need to re-extract it.
+- CI has **not run on GitHub yet** — validated locally only. First push to `develop` will
+  be the real test.
+
+**Blocked**
+
+- **Phase 0 day 1** — export against `csm` on `R-SEVEN64`. Still the only external blocker.
+
+**Next action**
+
+Plan day 4: convert the 130 C# sources to UTF-8 into a reference tree, detecting encoding
+per file (84 GB18030 / 39 UTF-8-BOM / 7 UTF-8).
 
 ---
 

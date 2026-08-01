@@ -21,7 +21,7 @@ const (
 	CodeUnauthorized       Code = "UNAUTHORIZED"
 	CodeForbidden          Code = "FORBIDDEN"
 	CodeNotFound           Code = "NOT_FOUND"
-	CodeConflict           Code = "CONFLICT"          // optimistic concurrency, 11.4
+	CodeConflict           Code = "CONFLICT" // optimistic concurrency, 11.4
 	CodeValidationFailed   Code = "VALIDATION_FAILED"
 	CodeInvalidCredentials Code = "AUTH_INVALID_CREDENTIALS"
 	CodeInternal           Code = "INTERNAL"
