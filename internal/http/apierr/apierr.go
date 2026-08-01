@@ -25,6 +25,10 @@ const (
 	CodeValidationFailed   Code = "VALIDATION_FAILED"
 	CodeInvalidCredentials Code = "AUTH_INVALID_CREDENTIALS"
 	CodeInternal           Code = "INTERNAL"
+	// CodeUnavailable: the route needs a dependency that is not configured
+	// (e.g. no database). Distinct from INTERNAL so an operator can tell a
+	// misconfiguration from a bug.
+	CodeUnavailable Code = "SERVICE_UNAVAILABLE"
 )
 
 // Error is the JSON body of every non-2xx response.
@@ -45,6 +49,7 @@ var statusFor = map[Code]int{
 	CodeValidationFailed:   http.StatusUnprocessableEntity,
 	CodeInvalidCredentials: http.StatusUnauthorized,
 	CodeInternal:           http.StatusInternalServerError,
+	CodeUnavailable:        http.StatusServiceUnavailable,
 }
 
 // Status returns the HTTP status for a code, defaulting to 500.

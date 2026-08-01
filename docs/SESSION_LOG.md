@@ -10,14 +10,14 @@ Newest entry first.
 
 ## Where things stand
 
-*Updated end of Day 6. Read this first; the entries below are the detail.*
+*Updated end of Day 11. Read this first; the entries below are the detail.*
 
 | | |
 |---|---|
 | **Phase** | Phase 1 (foundation) in progress. **Phase 0 not yet run** |
-| **Sessions logged** | 7 (Day 0–6) |
-| **Plan** | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — 161 sessions, 14 locked decisions |
-| **Next action** | Plan days 6–7: draft `migrations/0001_init.up.sql` skeleton from `docs/mysql/schema.sql`, marking every field Phase 0 must confirm |
+| **Sessions logged** | 12 (Day 0–11) |
+| **Plan** | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — 161 sessions, 17 locked decisions |
+| **Next action** | Slice 1 UI: wire the React login form to `POST /api/auth/login` and drive nav from the real `/api/auth/me`. **Phase 1 proper is blocked on Phase 0** |
 
 **Green — verified and repeatable**
 
@@ -30,6 +30,21 @@ Newest entry first.
 - English catalogue: **472/472** translated, `verify.mjs` exit=0 on both catalogues.
 - Encoding conversion lossless: 201 files, 5,435 CJK codepoints, 0 failures.
   `node tools/convert-encoding/convert.mjs` (add `--check` to verify only).
+- **Migrations apply to real MySQL 8.4** — 15 tables, 206 columns, 5 FKs, down leaves 0,
+  re-apply works. `row_version` blocks stale writes; utf8mb4 stores 4-byte chars intact.
+- **Legacy DES password verification matches two independent implementations**
+  (python-cryptography, openssl legacy provider) byte-for-byte.
+- **`auth.Service.Login`** — 22 tests: bcrypt path, legacy path + upgrade write, upgrade
+  failure does not fail login, unknown user indistinguishable, repo errors propagate.
+- **Migration 0003** (`password_bcrypt` + username index) verified on MySQL 8.4, down included.
+- **Migration 0004** (`tbl_session`) verified: unique token hash, FK guard, ON DELETE CASCADE.
+- **`auth.SessionService`** — idle + absolute timeouts, throttled touch, idempotent revoke,
+  immediate `RevokeAllForUser`.
+- **`store/mysql`** — 12 integration tests against real MySQL: Chinese round-trip, NULL
+  handling, atomic upgrade advancing `row_version`, unknown permission levels denying,
+  Shanghai wall-clock `DATETIME` round-trip.
+- **Working end-to-end login** — `POST /api/auth/login` → HttpOnly cookie → `GET /api/auth/me`
+  → menu filtered by real permissions. `POST /api/auth/logout` revokes server-side.
 - 49 permission keys match legacy `FrmMDIMain` exactly.
 - **CI** (`.github/workflows/ci.yml`) — 3 jobs, all 9 steps verified locally.
 
@@ -85,6 +100,433 @@ Newest entry first.
 **Next action**
 -
 ```
+
+---
+
+## Day 11 — 2026-08-01 — store/mysql + working login (slice 1)
+
+First genuinely working authentication: login issues a session, `/me` resolves it, logout
+kills it, and the menu is filtered by real permissions from `tbl_permission`.
+
+**Done**
+
+- `internal/store/mysql` — `Open` (charset-verified), `UserRepo`, `SessionRepo`.
+- `internal/http` — `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`
+  behind `requireAuth`, plus `requirePermission` for future routes.
+- `cmd/carsaleman` wires it all when a DSN is present.
+- CI runs the store integration tests against the MySQL service container.
+
+**Verified**
+
+```
+go test -race ./...                     all packages pass
+store integration (real MySQL 8.4)      12/12
+http                                    all pass
+gofmt / vet / web build / encoding / catalogues   PASS
+```
+
+**Three bugs found, one of them real**
+
+1. **`defer s.clearSessionCookie(w)` in logout never cleared the cookie.** The deferred
+   call runs *after* `WriteHeader` has flushed the headers, and `http.SetCookie` is
+   silently a no-op at that point — no error, no warning. Logout appeared to work while
+   leaving the cookie in place. Now: revoke, set the cookie, *then* write the status.
+
+   Worth noting the server-side revoke was always correct, so this was a tidiness bug
+   rather than a security hole — but only because revocation does the real work. On a JWT
+   design the same mistake would have been a genuine failure to log out, which is a small
+   argument in favour of D17 that I had not anticipated.
+
+2. **`requireAuth` panicked on a nil service.** With no DSN configured, every authenticated
+   route dereferenced nil and the recover middleware turned it into a generic 500. My own
+   comment claimed it would "fail loudly" — an unhandled panic is not a good loud failure.
+   Now returns `503 SERVICE_UNAVAILABLE`, which tells an operator it is a missing DSN
+   rather than a bug.
+
+3. Two `/me` tests were asserting 401 against a server with no services wired, which is
+   really the 503 case. Split into a proper unconfigured-server test plus auth tests on a
+   fully wired server.
+
+**Decisions inside the implementation**
+
+- **`FindByUsername` uses `ORDER BY uid LIMIT 1`.** The username index is deliberately
+  non-unique (0003) because the legacy data has never been constrained. Duplicates must
+  resolve deterministically rather than failing someone's login.
+- **`UpgradePassword` omits the `row_version` guard.** It is an idempotent credential
+  upgrade triggered by a successful login, not a user edit — two concurrent logins both
+  write a valid hash for the same password, and returning 409 to one would be worse than
+  last-write-wins.
+- **`LoadPermissions` returns an empty set, never nil.** A nil map invites being read as
+  "unrestricted".
+- **`Open` verifies the connection charset** rather than trusting the DSN. Getting this
+  wrong is silent: 4-byte characters are mangled with no error.
+- **`loc=Asia/Shanghai`, not UTC.** I had written UTC first. Every legacy `DATETIME` was
+  written by a Windows client in Chinese local time, so reading them as UTC would shift
+  every migrated date by 8 hours and break report equivalence (§9) — the acceptance
+  criterion for the whole port. Pinned by a round-trip test.
+- **`SameSite=Lax`, not Strict.** Strict drops the cookie when a user arrives via an
+  external link, logging them out for no gain here; Lax still blocks the cross-site POST
+  CSRF depends on.
+
+**Test-time note**
+
+The HTTP package built a bcrypt hash per test at production cost (12), which took 107s.
+Now uses a precomputed cost-4 hash: 31s. `auth.TestHashPasswordUsesProductionCost` still
+guards the real constant. Cross-package cost control is awkward because `hashCost` is
+unexported — acceptable now, worth revisiting if more packages need it.
+
+**Half-finished**
+
+- The React app still calls `/api/auth/me` directly on load and has no login submission —
+  the UI has not caught up with the API.
+- `requirePermission` exists but no route uses it yet; the first will be a real CRUD slice.
+
+**Blocked**
+
+- **Phase 0 day 1** — export against `csm` on `R-SEVEN64`.
+
+**Next action**
+
+Wire the React login form to `POST /api/auth/login`, handle 401 by showing the form, and
+drive nav from the real `/api/auth/me`.
+
+---
+
+## Day 10 — 2026-08-01 — D17 sessions (slice 1)
+
+Asked to decide the session strategy myself, as with Q1/Q2.
+
+**D17 — opaque server-side sessions, not JWT**
+
+The deciding factor is specific to this system: there is a permission-administration screen
+(`权限设定`). With a JWT, revoking a user's access does not take effect until the token
+expires — the user keeps working with permissions an administrator has already removed.
+**That is precisely the §10.8 failure this port exists to fix, relocated from the client to
+the token.** Fixing permission enforcement and then making it un-revokable defeats itself.
+
+The usual argument for JWT is horizontal scale. A few dozen users on one server has no
+scale argument to answer.
+
+Supporting choices:
+
+- **HttpOnly cookie, not an `Authorization` header.** An SPA holding a token in
+  `localStorage` is the classic XSS → account-takeover path; that weighs more now external
+  users are in scope (D12).
+- **The token is stored hashed** (SHA-256). A database leak should not yield usable
+  sessions — the same reasoning that puts bcrypt on the password column. SHA-256 rather
+  than bcrypt because the input is 256 bits of CSPRNG output: there is no low-entropy
+  secret to slow an attacker over, and this runs on *every* request.
+- **Permissions load per request**, never baked into the session, so a change takes effect
+  on the next call.
+- **Two clocks**: idle (8h, refreshed on use, so nobody is logged out mid-task) and
+  absolute (24h, un-extendable, bounding a stolen cookie).
+
+**Done**
+
+- `migrations/0004_sessions.{up,down}.sql`
+- `internal/auth/session.go` — issue, validate, revoke, revoke-all, sweep.
+- 11 session tests (33 in the package).
+- CI covers 0004 and asserts the session invariants.
+
+**Verified on MySQL 8.4**
+
+```
+tbl_session          8 columns, char(64) hash, varchar(45) ip (IPv6 fits)
+uq_token_hash        duplicate rejected
+fk_userinfoid        orphan session rejected
+ON DELETE CASCADE    deleting the user removed the session
+0004 down            table gone
+```
+
+`ON DELETE CASCADE` is deliberate and is the **only** cascade in this schema: a deleted user
+must not leave live sessions. Everywhere else a delete should fail loudly rather than
+propagate.
+
+**Two mistakes I made and caught**
+
+1. **A CI ordering bug.** The new sessions step inserts a user and deletes it; the following
+   `row_version` step then did `WHERE uid=1`. AUTO_INCREMENT had already moved past 1, so
+   that update would match nothing and the assertion would fail *for the wrong reason* —
+   a red build blamed on optimistic concurrency when the real cause is test coupling. Both
+   steps now use `LAST_INSERT_ID()`. Confirmed by replaying the two steps in order.
+2. **D17 was inserted above D16** in the decisions table. Reordered.
+
+**Also**
+
+MySQL's Docker entrypoint runs a *temporary* server during init, then stops it and starts
+the real one. A single successful `SELECT 1` can land on the temporary server and be
+followed by a restart — which is what caused an `ERROR 2002 socket` on the first attempt.
+Local checks now require the connection to hold for five consecutive seconds. CI is
+unaffected (the service container has its own health gate), but any local script needs this.
+
+**Half-finished**
+
+- `UserRepository` and `SessionRepository` still have no implementation. `store/mysql` is
+  **not** blocked by Phase 0 — the MySQL schema exists and is verified; only
+  `cmd/migrate-data` needs the live MSSQL. That is the next step.
+- No HTTP endpoint yet.
+
+**Blocked**
+
+- **Phase 0 day 1** — export against `csm` on `R-SEVEN64`.
+
+**Next action**
+
+Implement `store/mysql` for `UserRepository` and `SessionRepository`, tested against the
+Docker MySQL, then wire `POST /api/auth/login`.
+
+---
+
+## Day 9 — 2026-08-01 — Login service + password_bcrypt migration (slice 1)
+
+**Done**
+
+- `migrations/0003_password_bcrypt.{up,down}.sql` — the column plus a username index.
+- `internal/auth/service.go` — `Login` over a `UserRepository` interface, so the whole flow
+  is testable without a database.
+- 7 new service tests (22 in the package).
+- CI migrations job extended to cover 0003 and its independent rollback.
+
+**Verified against MySQL 8.4**
+
+```
+apply 0001 + 0002 + 0003   OK
+password_bcrypt            varchar(60) NULL, after `password`
+idx_tbl_userinfo_username  non_unique = 1
+60-char bcrypt hash        stored intact
+0003 down                  column 0, index 0
+0003 re-apply              OK
+```
+
+**Design decisions**
+
+- **`VARCHAR(60)` exactly.** A bcrypt hash is always 60 chars; a wider column invites
+  storing something that is not one. CI asserts the width.
+- **The username index is deliberately NOT unique.** The legacy data has never been
+  constrained, so duplicates may exist. `cmd/migrate-data` reports them; promoting to
+  unique is a follow-up once the data is known clean. CI asserts `non_unique = 1` so a
+  well-meaning "tidy-up" cannot quietly break the import.
+- The index exists at all because the legacy app selected the whole table and filtered
+  client-side (§2.4) — so no index was ever needed. The port issues a real `WHERE`.
+- **A failed upgrade write does not fail the login.** The user proved they know the
+  password; turning a storage blip into a lockout would be worse than retrying next login.
+- **Unknown user and wrong password are indistinguishable**, including in latency — a
+  missing user still burns one bcrypt comparison. Otherwise login is a username oracle.
+- **Repository errors are not authentication errors.** A dropped connection must surface as
+  a 500, never as "bad password".
+- `0003` is hand-written and must not be regenerated by `gen.mjs` — it describes the target
+  schema, not the legacy one.
+
+**Two harness bugs I hit, both worth remembering**
+
+1. **MySQL's init phase answers `mysqladmin ping` before the root password exists.** My
+   readiness loop exited early and every statement failed with `Access denied`. Wait on an
+   *authenticated query*, not on ping.
+2. **My check reported `OK` for failed commands** — `mysql … | grep -v Warning` returns
+   *grep's* status, not mysql's. Every migration "passed" while erroring. Fixed by
+   capturing mysql's exit code before filtering, and confirmed with a negative control
+   (a query against a non-existent table now fails correctly).
+
+The second is the more dangerous pattern: a green check that cannot go red. It is the same
+class of mistake as the CI step on Day 7 that printed `FAIL` without failing.
+
+**Half-finished**
+
+- No HTTP endpoint yet. `POST /api/auth/login` needs a **session strategy decision** first
+  (§3 lists "session/JWT"); making that call mid-session would be scope creep.
+- `UserRepository` has no implementation — `store/mysql` arrives with Phase 1 day 8–11,
+  which is blocked.
+
+**Blocked**
+
+- **Phase 0 day 1** — export against `csm` on `R-SEVEN64`.
+
+**Next action**
+
+Decide the session strategy (signed cookie vs JWT), then wire `POST /api/auth/login` and
+`GET /api/auth/me` to the real service.
+
+---
+
+## Day 8 — 2026-08-01 — Password migration (§6.5, slice 1 groundwork)
+
+Phase 1 is blocked on Phase 0, so took the highest-risk unblocked item instead. Get this
+wrong and **nobody can log in on cutover day**, and the failure presents as "bad password"
+rather than as a bug.
+
+**Done**
+
+- `internal/auth/password.go` — exact reproduction of the legacy DES scheme, bcrypt hashing,
+  and the dual-path `Verify` from §6.5.
+- 12 tests, including cross-implementation vectors.
+
+**Legacy scheme, recovered from the now-readable reference tree**
+
+```
+key    "123456ABCDEF"[:8] = "123456AB"   (UTF-8 bytes)
+iv     12 34 56 78 90 AB CD EF            (Global.DESKeys, hardcoded)
+cipher DES-CBC + PKCS#7                   (DESCryptoServiceProvider defaults)
+output Base64
+```
+
+The plan's §6.5 said the key was `"123456AB"`; the constant is actually `"123456ABCDEF"`
+and `DESEncode` truncates with `Substring(0, 8)`. Same effective key, but the plan would
+have misled anyone implementing from it directly.
+
+`FrmLogon.cs:71-76` encrypts what was typed and **string-compares the ciphertext**. With a
+fixed IV that makes it a deterministic, unsalted, *invertible* transform whose key is
+published in the source. Anyone holding the database holds every plaintext password — and
+since people reuse passwords, the blast radius is not limited to this application.
+
+**Verification — the part that matters**
+
+A round-trip test would pass even with the wrong key, IV or padding, because it would be
+wrong consistently. So the vectors come from **two independent implementations**, neither
+of which is the code under test:
+
+- `python-cryptography` (3DES with K1=K2=K3, which is mathematically single DES — its
+  public API no longer exposes plain DES)
+- `openssl enc -des-cbc -provider legacy`
+
+Both agree byte-for-byte with each other, and Go matches both. .NET's
+`DESCryptoServiceProvider` defaults to CBC + PKCS#7, so agreement with two
+standards-conformant implementations is agreement with the legacy app.
+
+Node was tried first and could not do it: OpenSSL 3 moved DES to the legacy provider, so
+`crypto.createCipheriv("des-cbc", …)` fails with `ERR_OSSL_EVP_UNSUPPORTED`.
+
+Vectors cover empty input, an exact block multiple (full extra padding block), UTF-8
+multibyte (`张三`), and mixed CJK+ASCII (`口令123`).
+
+**Design points**
+
+- `Verify` returns `(ok, needsUpgrade)`. Storage concerns stay in the caller, so the whole
+  thing is testable without a database.
+- **bcrypt takes precedence over legacy even when both are populated** — otherwise clearing
+  the legacy column becomes load-bearing for security rather than merely tidy.
+- A missing credential still burns one bcrypt comparison, so a non-existent user is not
+  distinguishable from a wrong password by response latency.
+- Constant-time compare on the legacy path.
+- `BcryptCost = 12`, above the default 10.
+
+**Test time: 52s → 1.3s**
+
+Cost 12 under `-race` is ~14s per call; four such tests put a minute of pure key stretching
+into every CI run. `export_test.go` lowers the cost for the test binary only, and
+`TestHashPasswordUsesProductionCost` asserts the production constant so the override cannot
+quietly become the real setting.
+
+**Note**
+
+`go get` bumped the language version 1.22 → 1.25 as a side effect of adding
+`golang.org/x/crypto`. CI reads `go-version-file: go.mod`, so this is consistent — but it
+is a real change and was not asked for.
+
+**Blocked**
+
+- **Phase 0 day 1** — export against `csm` on `R-SEVEN64`.
+
+**Next action**
+
+Slice 1 continues: `tbl_userinfo.password_bcrypt` column (a new migration), then the login
+handler wiring `Verify` to storage and performing the upgrade-on-success write.
+
+---
+
+## Day 7 — 2026-08-01 — Initial migrations (plan days 6–7)
+
+**Done**
+
+- `tools/gen-migration/gen.mjs` — generates the migrations from
+  `docs/mysql/schema.sql`. Generated rather than hand-copied: 15 tables of DDL
+  transcribed by hand reliably produces silent column-type errors, and a wrong
+  `DECIMAL` scale is not something a later test would catch.
+- Four files: `0001_init.{up,down}.sql`, `0002_foreign_keys.{up,down}.sql`.
+- **Applied and exercised against real MySQL 8.4** in Docker.
+- CI gains a `migrations` job with a MySQL service container (plan day 13's remaining item).
+
+**Two decisions locked — both change every table**
+
+**D15 — optimistic concurrency: `row_version INT UNSIGNED NOT NULL DEFAULT 1`**
+
+Legacy compared every original column plus `@IsNull_*` flags on each UPDATE/DELETE (§2.5);
+a naive `WHERE uid = ?` would turn today's concurrency violations into silent overwrites
+(§11.4).
+
+- *Rejected `updated_at`*: two updates inside one clock tick are indistinguishable, and
+  clock skew across app instances makes it worse. A counter has neither problem.
+- *Rejected whole-row comparison*: fragile around NULL handling and DECIMAL equality, and
+  produces enormous WHERE clauses for no gain over a counter.
+- *Deliberately did NOT add `created_at`/`updated_at`*: there is no source data for them,
+  so every migrated row would claim to have been created at migration time. Fabricated
+  timestamps in a financial system are worse than absent ones.
+
+**D16 — collation: storage stays `utf8mb4_unicode_ci`; display order in Go via
+`x/text/collate`**
+
+Legacy sorts under `Chinese_PRC_CI_AS` (pinyin). MySQL's closest analogue,
+`utf8mb4_zh_0900_as_cs`, is accent- **and case-sensitive** — which would silently change
+equality semantics for permission values (`读写`) and the `是否*` columns the app compares
+by value. **Changing sort order is a display bug; changing equality is a correctness bug.**
+So: keep case-insensitive equality, sort for display in the application.
+`ORDER BY carseries` in SQL is *not* authoritative for display order.
+
+**Foreign keys deliberately split into 0002**
+
+§5.3 requires validating for orphans *before* adding constraints, and that cannot happen
+until `cmd/migrate-data` has run. A single migration that fails halfway through adding
+constraints leaves a half-constrained schema. Load → verify → constrain.
+
+**Verified against MySQL 8.4.11 (not just "it parses")**
+
+```
+0001 up        15 tables, 206 columns (191 source + 15 row_version)
+0002 up        5 FKs, including the implied tbl_storechange.onroadid
+collation      utf8mb4_unicode_ci on every table
+0001 down      0 tables left
+re-apply       clean
+generator      191/191 source columns preserved, exactly 1 row_version per table
+```
+
+Behavioural, not structural:
+
+- fresh update with the correct `row_version` → 1 row affected
+- **stale update with a held version → 0 rows** — the lost write is prevented, and the
+  handler turns that into `409 Conflict`
+- FK rejects an orphan: `ERROR 1452 … fk_tbl_permission_userinfoid`
+- utf8mb4: `测试𠮷` → `chars=3 bytes=10 hex=E6B58BE8AF95F0A0AEB7`
+
+**A near-miss worth recording**
+
+The first utf8mb4 check reported `CHAR_LENGTH = 10` instead of 3, which reads exactly like
+broken 4-byte storage. It was not: nested shell quoting had lost the client charset. Re-run
+via stdin with `--default-character-set=utf8mb4`, it was correct.
+
+The lesson is not about the test. **`cmd/migrate-data` must set the connection charset
+explicitly** — a client that negotiates a narrower charset mangles 4-byte characters on the
+way in, silently, with no error. That is a data-corruption bug that would surface months
+later in a report. Written into the CI job as a comment so it is not re-learned.
+
+**CI note**
+
+The behavioural step originally printed `FAIL` without failing the build — a test that
+cannot fail. Rewritten to grep the output and exit non-zero, and validated with a negative
+control (an injected `FAIL` line is caught).
+
+**Blocked — and Phase 1 has now run out of unblocked work**
+
+- **Phase 0 day 1** — export against `csm` on `R-SEVEN64`.
+
+Everything remaining in Phase 1 depends on it: day 8–11 (`cmd/migrate-data`) needs both the
+reconciled schema *and* a live MSSQL to read from; the `TODO(phase0)` markers in
+`0001_init.up.sql` (defaults, indexes, checks, collation) cannot be resolved without the
+dump. Non-PK indexes are the most consequential of those — each one is a query the old
+system relied on, and rediscovering them under production load is the expensive route.
+
+**Next action**
+
+Run the export. Gate: **28 proc files, 5 view files**. Then re-run
+`node tools/gen-migration/gen.mjs` against the reconciled `schema.sql`.
 
 ---
 

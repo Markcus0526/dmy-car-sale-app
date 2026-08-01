@@ -15,6 +15,7 @@ func testServer() http.Handler {
 	return NewServer(
 		config.Config{Env: "dev", CORSOrigins: []string{"http://localhost:5173"}},
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
+		nil, nil,
 	).Handler()
 }
 
@@ -84,28 +85,57 @@ func TestRequestIDIsPropagatedFromClient(t *testing.T) {
 	}
 }
 
-func TestMeReturnsMenuAndPermissions(t *testing.T) {
+// A server with no database must say so, not panic into a generic 500 and
+// look like a bug.
+func TestAuthenticatedRouteWithoutDatabase(t *testing.T) {
 	rec := httptest.NewRecorder()
 	testServer().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/auth/me", nil))
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200", rec.Code)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503", rec.Code)
+	}
+	var body struct {
+		Code string `json:"code"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &body)
+	if body.Code != "SERVICE_UNAVAILABLE" {
+		t.Errorf("code = %q, want SERVICE_UNAVAILABLE", body.Code)
+	}
+}
+
+// /me is behind requireAuth: no cookie means 401, never a partially populated
+// body. This is the §10.8 boundary -- the client's nav gating is convenience.
+func TestMeRequiresAuthentication(t *testing.T) {
+	h, _ := authedServer(t, "s3cret")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/auth/me", nil))
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", rec.Code)
 	}
 
-	var body meResponse
+	var body struct {
+		Code string `json:"code"`
+	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("body is not JSON: %v", err)
 	}
-	if len(body.Menu) == 0 {
-		t.Error("menu is empty")
+	if body.Code != "UNAUTHORIZED" {
+		t.Errorf("code = %q, want UNAUTHORIZED", body.Code)
 	}
-	if len(body.Permissions) != len(allPermissionKeys()) {
-		t.Errorf("permissions = %d, want %d", len(body.Permissions), len(allPermissionKeys()))
-	}
-	for _, n := range body.Menu {
-		if n.PermissionKey == "" || n.LabelKey == "" {
-			t.Errorf("node %s is missing a key: %+v", n.ID, n)
-		}
+}
+
+// A garbage cookie must be rejected, not treated as absent-and-harmless.
+func TestMeRejectsBogusSessionCookie(t *testing.T) {
+	h, _ := authedServer(t, "s3cret")
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
+	req.AddCookie(&http.Cookie{Name: SessionCookieNameDev, Value: "not-a-real-token"})
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", rec.Code)
 	}
 }
 
