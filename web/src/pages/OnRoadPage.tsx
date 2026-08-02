@@ -7,6 +7,7 @@ import DataGrid from "../components/DataGrid";
 import FilterBar from "../components/FilterBar";
 import OnRoadFormModal from "./OnRoadForm";
 import HistoryModal from "../components/HistoryModal";
+import StoreInForm from "./StoreInForm";
 import { useCanWrite } from "../state/permissions";
 import { formatDecimal, asDecimal } from "../types/decimal";
 import type { Filter, FilterField } from "../types/filter";
@@ -46,6 +47,9 @@ export default function OnRoadPage() {
   const [lastFilter, setLastFilter] = useState<Filter>({ conditions: [] });
   /** The vehicle whose movement history is open, if any. */
   const [history, setHistory] = useState<OnRoadRow | null>(null);
+  /** The vehicle being stored in, if any. */
+  const [storingIn, setStoringIn] = useState<OnRoadRow | null>(null);
+  const canStoreIn = useCanWrite("入库处理");
 
   const [rows, setRows] = useState<OnRoadRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -101,20 +105,35 @@ export default function OnRoadPage() {
         id: "actions",
         header: () => "",
         cell: (ctx) => (
-          <button
-            className="btn btn--link"
-            // The row click opens the editor; stop this one reaching it.
-            onClick={(e) => {
-              e.stopPropagation();
-              setHistory(ctx.row.original);
-            }}
-          >
-            {t("movement.history")}
-          </button>
+          <>
+            {/* Offered only while the vehicle is still on the road. inflag 1
+                means it is already in stock, and the server would refuse. */}
+            {canStoreIn && ctx.row.original.inflag === 0 && (
+              <button
+                className="btn btn--link"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setStoringIn(ctx.row.original);
+                }}
+              >
+                {t("storein.submit")}
+              </button>
+            )}
+            <button
+              className="btn btn--link"
+              // The row click opens the editor; stop this one reaching it.
+              onClick={(e) => {
+                e.stopPropagation();
+                setHistory(ctx.row.original);
+              }}
+            >
+              {t("movement.history")}
+            </button>
+          </>
         ),
       },
     ],
-    [t, i18n.language],
+    [t, i18n.language, canStoreIn],
   );
 
   return (
@@ -162,6 +181,17 @@ export default function OnRoadPage() {
           onRoadID={history.uid}
           vin={history.vin}
           onClose={() => setHistory(null)}
+        />
+      )}
+
+      {storingIn && (
+        <StoreInForm
+          vehicle={storingIn}
+          onClose={() => setStoringIn(null)}
+          onDone={() => {
+            setStoringIn(null);
+            void search(lastFilter);
+          }}
         />
       )}
 

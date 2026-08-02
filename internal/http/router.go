@@ -36,12 +36,15 @@ type Server struct {
 // SERVICE_UNAVAILABLE, so the server still starts with no database and reports
 // a misconfiguration as a misconfiguration rather than a crash.
 type Deps struct {
-	Sessions *auth.SessionService
-	OnRoad   *storemysql.OnRoadRepo
-	BaseData *storemysql.BaseDataRepo
-	CarType  *storemysql.CarTypeRepo
-	Journal  *storemysql.JournalRepo
-	Movement *movement.Service
+	Sessions     *auth.SessionService
+	OnRoad       *storemysql.OnRoadRepo
+	BaseData     *storemysql.BaseDataRepo
+	CarType      *storemysql.CarTypeRepo
+	Journal      *storemysql.JournalRepo
+	Movement     *movement.Service
+	StoreInList  *storemysql.StoreInRepo
+	StoreOutList *storemysql.StoreOutRepo
+	QuarterStats *storemysql.QuarterStatsRepo
 }
 
 // NewServer wires the HTTP layer.
@@ -68,6 +71,8 @@ func (s *Server) Handler() http.Handler {
 	s.registerCarType(mux)
 	s.registerJournal(mux)
 	s.registerMovement(mux)
+	s.registerStock(mux)
+	s.registerQuarterStats(mux)
 
 	// Catch-all. Without it, unmatched routes fall through to the stdlib's
 	// "404 page not found" plaintext, the client's JSON parse fails, and every

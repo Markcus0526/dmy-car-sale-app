@@ -10,14 +10,14 @@ Newest entry first.
 
 ## Where things stand
 
-*Updated end of Day 27. Read this first; the entries below are the detail.*
+*Updated end of Day 39. Read this first; the entries below are the detail.*
 
 | | |
 |---|---|
 | **Phase** | Phase 1 (foundation) in progress. **Phase 0 not yet run** |
-| **Sessions logged** | 28 (Day 0–27) |
+| **Sessions logged** | 40 (Day 0–39) |
 | **Plan** | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — **158** sessions, **18** locked decisions. Q4 and Q5 answered; **Q10 opened** |
-| **Next action** | Store-in / transfer / dispatch **screens** over the movement service (the domain layer and API are done). Then slice 8's speccar + repair, and the quarterly grid. Decide **Q10**. **Phase 1 proper is blocked on Phase 0** |
+| **Next action** | Slice 8's remaining screens (特种车统计表, 赠送装修) — the last unblocked work, ~4 sessions. Then the runway is **spent** and everything left needs Phase 0. Decide **Q10** |
 
 **Green — verified and repeatable**
 
@@ -108,6 +108,140 @@ Newest entry first.
 **Next action**
 -
 ```
+
+---
+
+## Days 35–39 — 2026-08-02 — Quarterly targets (§6.3)
+
+**Done**
+
+`internal/domain/quarterstats` (pure arithmetic), the repository, GET + whole-
+quarter PUT, and the editable dual-block grid.
+
+**The finding: .NET and Go round differently, and it shows up here**
+
+`String.Format("{0:0.00}%", per)` formats a .NET `decimal` by rounding **half
+away from zero**. Go's `fmt "%.2f"` rounds **half to even**, on a float64 whose
+binary value may already sit just below the midpoint.
+
+    1/160 = 0.625%   .NET "0.63%"   Go %.2f "0.62%"
+
+That is a last-digit disagreement nobody could explain during report
+equivalence testing. `FormatPercent` computes in integers and rounds
+explicitly. Verified empirically, not assumed — the test asserts Go's own
+formatter *disagrees*, so if Go ever changes, the test fails and says why.
+
+**Also ported faithfully**
+
+- The subtotal percentage divides `(a2+a3+a4)` by `a1`, **not** `a5` by `a1`.
+  They are equal only because col5 is recomputed in the same loop before a5
+  accumulates it. Reproduced as written so the equivalence is provable.
+- A zero target yields the literal `"0.00%"` — the original guards it
+  explicitly and the reports depend on the string.
+- Grid row 7 is always `"0"`: the legacy loader writes the literal and never
+  reads it from the database. Carried as `Row.Extra` so it is explicit rather
+  than a mystery column.
+
+**Where I did not follow the original**
+
+The legacy general-block query has **no `type` predicate at all** (line 176)
+while the special block filters `type = 1` (line 206). Reproduced as "not
+special" rather than "no filter", because the literal original would let a
+special series' row satisfy the general query and appear in *both* blocks. In
+practice the two blocks draw from different lists so they never overlap — but
+that is a coincidence, not a guarantee. `TODO(phase0)` records what to count.
+
+**Save is a whole-quarter PUT**, per §6.3. One `tbl_quarterstats` row carries
+all twelve months and all four quarters, so `TestSavingOneQuarterLeavesTheOthersAlone`
+is the load-bearing test: editing Q3 must not disturb Q1, Q2, Q4 or the other
+nine months. The legacy form saved on year/quarter switch, which §6.3 names as
+where it is most likely to lose edits.
+
+**New guard: screen routes**
+
+`tools/check-routes/check.mjs`. I wired the quarterly screen as `quarterTarget`
+when the menu id is `quarter-target`. That fails **nothing** — no build error,
+no typecheck error, no runtime throw. The condition never matches and the route
+silently renders `PlaceholderPage`, so the screen just looks unbuilt.
+
+The guard also refuses to pass vacuously: if either regex stops matching it
+fails rather than reporting success over zero ids. Negative control validated —
+reintroducing the typo exits 1 and names it.
+
+**Verified**
+
+`./scripts/check.sh --db` → **ALL CHECKS PASS**. 8 domain tests, 6 repository
+tests against real MySQL, 5 handler tests. Catalogues at **237** keys, parity
+holds.
+
+**Runway status**
+
+Slice 8's 特种车统计表 and 赠送装修 are the last unblocked screens — roughly 4
+sessions. After that everything remaining needs the Phase 0 export.
+
+---
+
+## Days 28–34 — 2026-08-02 — Slices 5, 6 and 7: stock screens end to end
+
+**Done**
+
+The screens over the day-24–27 movement service, and the two views they read.
+
+- `migrations/0006` — `vw_storein` (42 cols) and `vw_storeout` (55 cols),
+  provisional, reproducing the §3 contracts exactly.
+- `stock_repo.go` — both list repositories with allowlisted filters.
+- `handler_stock.go` — two list routes; the filter-error translation extracted
+  and shared with the on-road screen.
+- `LookupSelect` — a dropdown backed by any `tbl_basedata` domain. **This is
+  what slice 2 was for**: 库位, 进货途径, 批复人, 经手人 stop being free-text
+  boxes where every operator invents their own spelling.
+- `StoreInForm`, `StoreInPage` (with the transfer dialog), `StoreOutPage`.
+- Store-in action wired into the on-road grid, offered only while `inflag = 0`.
+
+**Judgement calls**
+
+1. **Both views LEFT JOIN**, same reasoning as `vw_onroad`: an INNER original
+   reproduced as LEFT shows extra rows, which is visible and reported; a LEFT
+   original reproduced as INNER loses rows silently.
+   `TestStoreInViewKeepsOrphanedRows` pins it.
+
+2. **`Expr1` is exposed as `NULL`.** It is an unnamed computed expression in
+   the original `vw_storeout` and its formula is not recoverable from this
+   repo. Exposed rather than dropped so the column name and arity survive —
+   anything consuming it gets an obviously wrong value instead of a subtly
+   wrong one, and the report code does not fail on a missing column.
+
+3. **The finance columns are deliberately absent from the list types.**
+   `propval`, `profitprop`, `profitval`, `specprofitval`, `outstoreprice`
+   belong to the finance engine (§6.1, blocked on Phase 0). Pulling them into
+   a stock list would put margin data on a screen that does not need it and
+   would have to be unpicked later.
+
+4. **`outflag` is filterable; `inflag` is not.** "What is still on the lot" is
+   the question the stock screen exists to answer. `inflag` is internal
+   lifecycle state a filter has no business reaching.
+
+5. **A `LookupSelect` value no longer in its domain is still shown.** Someone
+   deleted the entry after the record was written; silently dropping it would
+   blank a field the user never touched.
+
+**New guard: view column arity**
+
+`check.sh` now asserts 19 / 42 / 55 columns on the three views. The contracts
+are load-bearing — the report code selects against them by name — so a dropped
+or renamed column in a provisional definition would surface much later as a
+report that silently loses a field. All three match.
+
+**Verified**
+
+`./scripts/check.sh --db` → **ALL CHECKS PASS**. 5 new stock-view integration
+tests confirmed executing against real MySQL. Catalogues at **223** keys,
+parity holds.
+
+**What remains of the runway**
+
+Slice 8's speccar and 赠送装修 screens, and the quarterly-target grid (§6.3).
+Roughly 8–10 sessions. After that everything left needs the Phase 0 export.
 
 ---
 
