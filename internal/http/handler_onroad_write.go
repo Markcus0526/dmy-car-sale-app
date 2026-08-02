@@ -96,12 +96,12 @@ func (s *Server) handleOnRoadGet(w http.ResponseWriter, r *http.Request) {
 		apierr.Write(w, apierr.CodeBadRequest, reqID, nil)
 		return
 	}
-	if s.onroad == nil {
+	if s.OnRoad == nil {
 		apierr.Write(w, apierr.CodeUnavailable, reqID, nil)
 		return
 	}
 
-	row, version, err := s.onroad.Get(r.Context(), uid)
+	row, version, err := s.OnRoad.Get(r.Context(), uid)
 	if errors.Is(err, storemysql.ErrNotFound) {
 		apierr.Write(w, apierr.CodeNotFound, reqID, nil)
 		return
@@ -127,12 +127,12 @@ func (s *Server) handleOnRoadCreate(w http.ResponseWriter, r *http.Request) {
 		apierr.Write(w, apierr.CodeValidationFailed, reqID, fields)
 		return
 	}
-	if s.onroad == nil {
+	if s.OnRoad == nil {
 		apierr.Write(w, apierr.CodeUnavailable, reqID, nil)
 		return
 	}
 
-	uid, err := s.onroad.Create(r.Context(), in)
+	uid, err := s.OnRoad.Create(r.Context(), in)
 	if err != nil {
 		s.log.Error("creating on-road vehicle failed", "err", err, "request_id", reqID)
 		apierr.Write(w, apierr.CodeInternal, reqID, nil)
@@ -141,7 +141,7 @@ func (s *Server) handleOnRoadCreate(w http.ResponseWriter, r *http.Request) {
 
 	// 201 with the stored row, not the submitted one: the response must show
 	// what the database actually holds, including anything it normalised.
-	row, version, err := s.onroad.Get(r.Context(), uid)
+	row, version, err := s.OnRoad.Get(r.Context(), uid)
 	if err != nil {
 		s.log.Error("re-reading created vehicle failed", "err", err, "request_id", reqID)
 		apierr.Write(w, apierr.CodeInternal, reqID, nil)
@@ -175,12 +175,12 @@ func (s *Server) handleOnRoadUpdate(w http.ResponseWriter, r *http.Request) {
 		apierr.Write(w, apierr.CodeValidationFailed, reqID, fields)
 		return
 	}
-	if s.onroad == nil {
+	if s.OnRoad == nil {
 		apierr.Write(w, apierr.CodeUnavailable, reqID, nil)
 		return
 	}
 
-	err := s.onroad.Update(r.Context(), uid, form.RowVersion, in)
+	err := s.OnRoad.Update(r.Context(), uid, form.RowVersion, in)
 	switch {
 	case errors.Is(err, storemysql.ErrNotFound):
 		apierr.Write(w, apierr.CodeNotFound, reqID, nil)
@@ -196,7 +196,7 @@ func (s *Server) handleOnRoadUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	row, version, err := s.onroad.Get(r.Context(), uid)
+	row, version, err := s.OnRoad.Get(r.Context(), uid)
 	if err != nil {
 		s.log.Error("re-reading updated vehicle failed", "err", err, "request_id", reqID)
 		apierr.Write(w, apierr.CodeInternal, reqID, nil)

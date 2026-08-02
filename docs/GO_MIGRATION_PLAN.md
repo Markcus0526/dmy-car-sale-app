@@ -101,7 +101,7 @@ Sorted by size. `→ target` is the web screen or module it becomes.
 | `FrmBaseDataEdit` | 124 | reference-data modal |
 | `FrmEnvSet` | 108 | **drop** — DB connection config becomes server env |
 | `FrmSplash` | 106 | **drop** |
-| `FrmActionHis` | 75 | audit-trail viewer (`tbl_log`) |
+| `FrmActionHis` | 75 | per-vehicle movement history, rendered as text from a `List<StoreChange>` the caller passes in. **Does not touch `tbl_log`** — corrected day 23 |
 | `FrmDateSetting` | 69 | date-range picker component |
 | `FrmBaseDataImport` | 58 | reference-data import |
 
@@ -293,7 +293,7 @@ GET    /api/stats/{name}?startdate=&enddate=      7 statistics screens
 GET    /api/charts/{name}?startdate=&enddate=     5 charts → JSON
 GET    /api/reports/{name}?startdate=&enddate=&format=pdf|xlsx|json   11 reports
 
-GET    /api/log                         tbl_log audit trail
+GET    /api/journal                     tbl_log — 特殊日记, user-authored notes (NOT an audit trail)
 ```
 
 **Cross-cutting conventions**
@@ -302,7 +302,12 @@ GET    /api/log                         tbl_log audit trail
   `conjunction`) — never a raw expression string.
 - All decimals serialize as JSON **strings** (§11.2).
 - Writes to `tbl_*` carry `row_version`; mismatch → `409 Conflict` (§11.4).
-- Every mutation writes `tbl_log` (the audit trail the README claims).
+- ~~Every mutation writes `tbl_log` (the audit trail the README claims).~~
+  **Corrected day 23.** There is no audit trail in the legacy system. `tbl_log`
+  has exactly one user in the whole codebase — `FrmSpecJournal` (特殊日记), a
+  user-authored notes table of date/title/body. `FrmActionHis` reads
+  `tbl_storechange`, not `tbl_log`. The README's claim is not implemented.
+  Whether to ADD an audit trail is Q10, and it is new scope, not migration.
 
 ---
 

@@ -116,8 +116,9 @@ machine-drafted `en.json`.
 | # | Question | Needed by | Impact if wrong |
 |---|---|---|---|
 | Q3 | **§11.6** — do suppliers send `.xls` or `.xlsx`? | Day 66 (slice 4) | `.xls` adds a converter, ~+3 days. Free to ask now |
-| Q4 | **§5.6** — is `tbl_basedata.type` 1 vs 2 meaningful? | Day 50 (slice 2) | `CmsDB.xsd` doesn't record it. Answer from live row counts in Phase 0 |
-| Q5 | Which `tbl_basedata` domains get English labels? | Day 50 (slice 2) | Default per §1.1 table; confirm the judgement-call row |
+| ~~Q4~~ | **ANSWERED day 20, from the source — no Phase 0 needed.** `type` is a per-DOMAIN display-shape flag: `1` hides `keyname` and stores `""`; `2` shows it and bulk import splits each line on the first `:` ([FrmBaseData.cs:93-101, 300-318](../CarSaleMan/CarSaleMan/FrmBaseData.cs#L93-L101)). Chosen once at domain creation and applied to every row underneath. `internal/store/mysql` now enforces that invariant, which the legacy schema could not express |
+| ~~Q5~~ | **DECIDED day 21.** The 17 KNOWN domain NAMES get a catalogue label (`basedata.domain.*`) because they are chrome and the set is fixed; anything else — including domains created at runtime — falls back to the stored Chinese. VALUES are never translated (D18) |
+| Q10 | **Add a real audit trail?** The README claims one; the code has none (day 23) | Before Phase 3 closes | New scope, not migration. Recommended: yes — a financial system where any user can silently change a cost price has no way to answer "who changed this". ~3 sessions: a `tbl_audit` table, a write hook on every mutating repo, and a viewer |
 
 ### Non-blocking — decide when convenient
 
@@ -291,7 +292,7 @@ software from slice 1 (D8).
 | 7 — store-out | 89–96 | BE 4 / UI 3 / i18n 1 | §6.2 |
 | 8 — special cars, repair, journal | 97–102 | BE 3 / UI 3 | |
 | 9 — finance | 103–111 | BE 5 / UI 3 / i18n 1 | §6.1. Most test-heavy slice. Needs Phase 2 complete |
-| 10 — audit trail | 112–113 | 2 | Viewer only; the write path is added per-slice throughout |
+| 10 — ~~audit trail~~ movement history | 112–113 | 2 | **Respecified day 23.** `tbl_log` is the 特殊日记 notes table (slice 8), not an audit trail. What slice 10 actually owes is `FrmActionHis`: a per-vehicle movement history over `tbl_storechange`. Adding a real audit trail is **Q10** — new scope |
 
 **Three things to carry deliberately into slice 9** (§6.1):
 

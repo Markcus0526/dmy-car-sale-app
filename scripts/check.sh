@@ -165,9 +165,31 @@ else
   fail "schema behaviour: expected 5 assertions, got $(echo "$out" | grep -c '^ok ')"
 fi
 
-section "Store integration"
-CARSALEMAN_TEST_DSN='root:test@tcp(127.0.0.1:13306)/csm' \
-  step "go test ./internal/store/mysql" go test -race ./internal/store/mysql/
+section "Database integration"
+# Both packages skip themselves without a DSN, so they must be named here --
+# the plain `go test ./...` above runs them as no-ops. internal/domain/movement
+# in particular is entirely about transactions and row guards; skipping it
+# silently would leave the lifecycle unverified while the suite still says PASS.
+export CARSALEMAN_TEST_DSN='root:test@tcp(127.0.0.1:13306)/csm'
+step "go test ./internal/store/mysql"     go test -race ./internal/store/mysql/
+step "go test ./internal/domain/movement" go test -race ./internal/domain/movement/
+
+# Guard against exactly that: assert the movement tests actually RAN.
+#
+# Two traps, both of which made this report a false failure:
+#   -count=1  defeats the test cache. Without it `go test` prints "(cached)"
+#             and no "--- PASS" line at all.
+#   no pipe   `set -o pipefail` is on, and `grep -q` exits at the first match,
+#             closing the pipe. `go test` then dies of SIGPIPE and pipefail
+#             propagates THAT as the pipeline's status -- so the command passes
+#             standalone and fails inside this script.
+mv_out=$(go test -count=1 -v -run TestStoreInTwiceIsRejected ./internal/domain/movement/ 2>&1)
+if grep -q -- "--- PASS" <<<"$mv_out"; then
+  pass "movement tests really executed (not skipped)"
+else
+  fail "movement tests were skipped or failed — the DSN is not reaching them"
+fi
+unset CARSALEMAN_TEST_DSN
 
 docker rm -f "$CONTAINER" >/dev/null 2>&1
 fi

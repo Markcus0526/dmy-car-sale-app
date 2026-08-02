@@ -121,8 +121,7 @@ func authedServer(t *testing.T, password string) (http.Handler, *memUserRepo) {
 		config.Config{Env: "dev", CORSOrigins: []string{"http://localhost:5173"}},
 		log,
 		auth.NewService(users, log),
-		auth.NewSessionService(&memSessionRepo{byHash: map[string]*auth.Session{}}),
-		nil,
+		Deps{Sessions: auth.NewSessionService(&memSessionRepo{byHash: map[string]*auth.Session{}})},
 	)
 	return srv.Handler(), users
 }

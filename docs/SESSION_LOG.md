@@ -10,14 +10,14 @@ Newest entry first.
 
 ## Where things stand
 
-*Updated end of Day 19. Read this first; the entries below are the detail.*
+*Updated end of Day 27. Read this first; the entries below are the detail.*
 
 | | |
 |---|---|
 | **Phase** | Phase 1 (foundation) in progress. **Phase 0 not yet run** |
-| **Sessions logged** | 20 (Day 0–19) |
-| **Plan** | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — **158** sessions, **18** locked decisions |
-| **Next action** | Slice 2 — reference data (`tbl_basedata`), which turns the raw `cartypeid` box into a picker. Excel import still needs Q3. **Phase 1 proper is blocked on Phase 0** |
+| **Sessions logged** | 28 (Day 0–27) |
+| **Plan** | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — **158** sessions, **18** locked decisions. Q4 and Q5 answered; **Q10 opened** |
+| **Next action** | Store-in / transfer / dispatch **screens** over the movement service (the domain layer and API are done). Then slice 8's speccar + repair, and the quarterly grid. Decide **Q10**. **Phase 1 proper is blocked on Phase 0** |
 
 **Green — verified and repeatable**
 
@@ -108,6 +108,205 @@ Newest entry first.
 **Next action**
 -
 ```
+
+---
+
+## Days 24–27 — 2026-08-02 — The vehicle lifecycle (§6.2), slices 5/6/7/10
+
+**Done**
+
+`internal/domain/movement` — the state machine every remaining movement screen
+sits on. Store-in, transfer, dispatch and history, plus five API routes, the
+history viewer UI, and 16 integration tests against real MySQL.
+
+This is the §6.2 work the plan calls *highest business value*, and the one place
+it says the port should deliberately **not** be faithful.
+
+**What the original did, and what this does instead**
+
+Each transition was 2–3 independent adapter `Update()` calls with **no
+transaction** (FrmStoreInAddMan.cs:318-395). A crash between them left a vehicle
+half-moved — flagged as stored with no stock row, or a stock row with the flag
+never set. Here every transition is one transaction with a guarded flag update,
+so a double submit fails loudly instead of storing the same car twice.
+
+`TestStoreInRollsBackEverythingOnFailure` pins that: it forces a failure *after*
+the flag update has already succeeded inside the transaction, then asserts the
+flag, the stock row and the movement row are all absent.
+
+`TestConcurrentStoreInStoresExactlyOnce` races eight goroutines at one vehicle;
+exactly one wins and exactly one `tbl_storein` row exists.
+
+**Three legacy defects fixed rather than ported**
+
+1. **`changeid` was `tbl_storechange.Rows.Count`** — the row count of the
+   *client's cached DataTable*, at six call sites. Two clients mint the same id,
+   it moves backwards when rows are deleted, and it depends on what the client
+   happened to have loaded. Now `MAX(changeid)+1` allocated inside the
+   transaction. Safe because nothing queries on it — every read site just
+   displays it.
+
+2. **`batchno` used .NET's `hh`, which is 12-HOUR.** 09:00 and 21:00 produced
+   the identical string, silently merging two deliveries twelve hours apart.
+   Now `HH`, generated server-side, in `Asia/Shanghai`.
+
+3. **Transfers left `tbl_storein.storeplace` stale** on some paths — the history
+   said the car had moved while the stock list still pointed at the old bay.
+   Now both move in one transaction.
+
+**Where I did NOT follow the plan**
+
+§6.6 recommends a `UNIQUE` index on `batchno`. **Not applied.** `batchno` is
+per-row (`txtbatchno` binds to the BindingSource's *current* row), the legacy
+generator has one-second resolution, and an operator clicking through ten
+vehicles in a batch can easily mint ten identical numbers — so duplicates are
+likely to already exist. Adding the constraint before the dump is examined would
+fail the migration on live data. Same reasoning as the deliberately non-unique
+username index. `TODO(phase0)` records what to count.
+
+**Slice 10 delivered, correctly specified**
+
+`HistoryModal` reads `tbl_storechange` — which is what `FrmActionHis` actually
+shows, per the day-23 correction. Rendered as a timeline rather than the
+original's monospace textbox, which does not wrap, select cleanly, or read
+aloud.
+
+**Two bugs in my own check script, both caught by a negative control**
+
+`scripts/check.sh` now names the movement package explicitly — `go test ./...`
+runs it as a no-op without a DSN, so the lifecycle would have been unverified
+while the suite still printed PASS. The guard that asserts the tests *really
+ran* failed twice for reasons worth recording:
+
+1. `go test` served a **cached** result, so no `--- PASS` line was printed.
+   Needs `-count=1`.
+2. `set -o pipefail` + `grep -q`: `-q` exits at the first match and closes the
+   pipe, `go test` dies of SIGPIPE, and pipefail propagates that as the
+   pipeline's status. The command passed standalone and failed inside the
+   script. Now captured to a variable first.
+
+**Verified**
+
+`./scripts/check.sh --db` → **ALL CHECKS PASS**, including the new
+"movement tests really executed (not skipped)" assertion. 16 movement
+integration tests, 6 handler tests. Catalogues at **194** keys, parity holds.
+
+**Next action**
+
+The store-in / transfer / dispatch **screens**. The domain layer and API are
+done and tested; what remains is form UI over them.
+
+---
+
+## Days 20–23 — 2026-08-02 — Slice 2 (reference data), car-type picker, journal
+
+**Done**
+
+*Day 20 — `tbl_basedata` backend.* Repository with domain and value CRUD, bulk
+import, and a `type` invariant the legacy schema could not express. Nine routes.
+
+*Day 21 — reference-data UI.* Two-pane screen (`BaseDataPage`), `ConfirmDialog`,
+domain add/rename/delete, value add/edit/delete, bulk-import dialog.
+
+*Day 22 — car-type picker.* `tbl_cartype` lookup repo + two routes, and
+`CarTypePicker` — a type-to-filter combobox that **removes the raw `cartypeid`
+box** slice 4 shipped as a stopgap. Selecting a type prefills carname, the
+interior fields and the cost price.
+
+*Day 23 — journal, and a plan correction.* `tbl_log` CRUD + `JournalPage`.
+`NewServer` refactored to a `Deps` struct.
+
+**Q4 — ANSWERED from the source. No Phase 0 needed.**
+
+`tbl_basedata.type` is a per-DOMAIN display-shape flag, not a data category:
+
+- `1` — value-only; `keyname` hidden and stored as `""`.
+- `2` — key/value pair; `keyname` shown, and bulk import splits each line on the
+  first `:`.
+
+Chosen once at domain creation and applied to every row underneath
+([FrmBaseData.cs:93-101, 300-318](../CarSaleMan/CarSaleMan/FrmBaseData.cs#L93-L101)).
+The repository now enforces that invariant — a value inherits its domain's type
+rather than accepting one — and `DomainTypeConflicts` *reports* legacy rows that
+violate it instead of silently normalising them. Picking a winner would destroy
+the evidence of a real data problem.
+
+**Q5 — DECIDED.** The 17 known domain NAMES get a catalogue label; anything
+else, including domains created at runtime, falls back to the stored Chinese.
+Values are never translated (D18).
+
+**Q10 — OPENED. The plan was wrong about the audit trail.**
+
+`GO_MIGRATION_PLAN.md` §11.3 said "every mutation writes `tbl_log` (the audit
+trail the README claims)" and listed `FrmActionHis` as its viewer. Both are
+wrong, and I checked the source rather than the summary:
+
+1. `tbl_log` has **exactly one user in the entire codebase** — `FrmSpecJournal`
+   (特殊日记), an editable grid of date/title/body rows staff write by hand.
+   Its new-row handler defaults `title` and `cont` to `""`.
+2. `FrmActionHis` never touches `tbl_log`. It renders a `List<StoreChange>` its
+   caller passes in, as formatted text — a per-vehicle movement history over
+   `tbl_storechange`.
+
+**There is no audit trail in this system.** The README claims one; the code does
+not implement it. Slice 10's 2 sessions were budgeted for work that is partly
+duplicate (the journal is already in slice 8) and partly misdescribed.
+
+Both documents corrected. Whether to *add* an audit trail is **Q10** — new
+scope, not migration. Recommended: yes. In a system where any user with 读写 can
+change a cost price, there is currently no way to answer "who changed this".
+
+**Judgement calls**
+
+1. **A new domain gets a blank placeholder row.** A domain has no existence
+   apart from its rows in this schema, so an empty one means one row. `Lookup`
+   filters it out for dropdowns while `Values` keeps it visible in the admin
+   screen — a blank option in 地区 would be a bug users hit on day one.
+
+2. **`/api/lookup/{name}` is gated on a session, not on 基础信息.** Filling in a
+   sale needs the 地区 list; it does not need the right to administer reference
+   data. Gating it on the admin permission would force every clerk to hold one.
+
+3. **`CarTypeRepo.List` filters `deleted = 0`; `Get` deliberately does not.** A
+   discontinued model must stop being offered for NEW vehicles while staying
+   resolvable for the thousands of existing rows that reference it. Filtering in
+   both places would blank the field on exactly the historic records people look
+   up most.
+
+4. **The picker prefills only BLANK fields.** Overwriting something the user
+   typed, or loaded from an existing record, would silently discard it — and on
+   `inprice` that is a money field.
+
+5. **Import reproduces the legacy parse exactly**, including "a line with no
+   colon becomes the value". Operators have files in that format; a stricter
+   parser would reject work that used to load. It is one transaction, unlike the
+   original, where a partial import was the normal outcome.
+
+6. **`NewServer` now takes a `Deps` struct.** Seven positional parameters, most
+   of them nil in tests, is a shape where transposing two of the same type
+   compiles and wires the wrong repository to the wrong handler.
+
+7. **Dates are built from local parts, never `toISOString()`.** That converts to
+   UTC first, so anyone east of Greenwich gets tomorrow's date for most of their
+   evening — and this system runs in `Asia/Shanghai`.
+
+**Bug caught before it shipped**
+
+`domainType` scanned `MIN(type)` into an `int`. A bare aggregate over zero rows
+returns **one row holding NULL**, not no rows — so a missing domain would have
+surfaced as a driver conversion error (500) instead of `ErrNotFound` (404).
+Now scanned into `sql.NullInt64`.
+
+**Verified**
+
+`./scripts/check.sh --db` → **ALL CHECKS PASS**. 14 new reference-data store
+tests, 4 car-type, 4 journal, 8 handler tests — all confirmed running against
+real MySQL, not skipped. Catalogues at **176** keys each, parity holds.
+
+**Next action**
+
+Decide Q10. Then slice 6 (`tbl_storechange` — which also supplies the movement
+history slice 10 actually owes) or the quarterly-target grid.
 
 ---
 

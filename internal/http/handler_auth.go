@@ -66,7 +66,7 @@ type loginRequest struct {
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	reqID := RequestIDFrom(r.Context())
 
-	if s.auth == nil || s.sessions == nil {
+	if s.auth == nil || s.Sessions == nil {
 		s.log.Error("login attempted with no database configured", "request_id", reqID)
 		apierr.Write(w, apierr.CodeUnavailable, reqID, nil)
 		return
@@ -103,7 +103,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := s.sessions.Issue(r.Context(), result.User.ID, clientIP(r), r.UserAgent())
+	token, err := s.Sessions.Issue(r.Context(), result.User.ID, clientIP(r), r.UserAgent())
 	if err != nil {
 		s.log.Error("issuing session failed", "err", err, "request_id", reqID)
 		apierr.Write(w, apierr.CodeInternal, reqID, nil)
@@ -125,11 +125,11 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	// WriteHeader has already flushed the headers, and http.SetCookie is
 	// silently a no-op at that point. The cookie would never be cleared and
 	// nothing would report an error.
-	if s.sessions != nil {
+	if s.Sessions != nil {
 		if c, err := r.Cookie(s.sessionCookieName()); err == nil && c.Value != "" {
 			// Revocation is what actually ends the session. Clearing the cookie
 			// only tidies the browser; a stolen token must die server-side.
-			if err := s.sessions.Revoke(r.Context(), c.Value); err != nil {
+			if err := s.Sessions.Revoke(r.Context(), c.Value); err != nil {
 				s.log.Error("revoking session failed", "err", err,
 					"request_id", RequestIDFrom(r.Context()))
 			}

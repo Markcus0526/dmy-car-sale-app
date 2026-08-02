@@ -34,8 +34,7 @@ func onRoadServer(t *testing.T, level auth.Level) (http.Handler, *http.Cookie) {
 		config.Config{Env: "dev"},
 		log,
 		auth.NewService(users, log),
-		auth.NewSessionService(&memSessionRepo{byHash: map[string]*auth.Session{}}),
-		nil,
+		Deps{Sessions: auth.NewSessionService(&memSessionRepo{byHash: map[string]*auth.Session{}})},
 	)
 	h := srv.Handler()
 

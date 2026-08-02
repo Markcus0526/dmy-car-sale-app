@@ -6,6 +6,7 @@ import { ApiError, NetworkError, listOnRoad, type OnRoadRow } from "../api/clien
 import DataGrid from "../components/DataGrid";
 import FilterBar from "../components/FilterBar";
 import OnRoadFormModal from "./OnRoadForm";
+import HistoryModal from "../components/HistoryModal";
 import { useCanWrite } from "../state/permissions";
 import { formatDecimal, asDecimal } from "../types/decimal";
 import type { Filter, FilterField } from "../types/filter";
@@ -43,6 +44,8 @@ export default function OnRoadPage() {
   const [editing, setEditing] = useState<Editing>(undefined);
   /** The filter the grid currently shows, so a save can re-run it. */
   const [lastFilter, setLastFilter] = useState<Filter>({ conditions: [] });
+  /** The vehicle whose movement history is open, if any. */
+  const [history, setHistory] = useState<OnRoadRow | null>(null);
 
   const [rows, setRows] = useState<OnRoadRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,6 +97,22 @@ export default function OnRoadPage() {
         },
         meta: { numeric: true },
       },
+      {
+        id: "actions",
+        header: () => "",
+        cell: (ctx) => (
+          <button
+            className="btn btn--link"
+            // The row click opens the editor; stop this one reaching it.
+            onClick={(e) => {
+              e.stopPropagation();
+              setHistory(ctx.row.original);
+            }}
+          >
+            {t("movement.history")}
+          </button>
+        ),
+      },
     ],
     [t, i18n.language],
   );
@@ -137,6 +156,14 @@ export default function OnRoadPage() {
         // that opens a form they cannot save.
         onRowClick={canWrite ? (row) => setEditing(row.uid) : undefined}
       />
+
+      {history && (
+        <HistoryModal
+          onRoadID={history.uid}
+          vin={history.vin}
+          onClose={() => setHistory(null)}
+        />
+      )}
 
       {editing !== undefined && (
         <OnRoadFormModal

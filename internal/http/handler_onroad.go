@@ -32,7 +32,7 @@ type onRoadListResponse struct {
 func (s *Server) handleOnRoadList(w http.ResponseWriter, r *http.Request) {
 	reqID := RequestIDFrom(r.Context())
 
-	if s.onroad == nil {
+	if s.OnRoad == nil {
 		apierr.Write(w, apierr.CodeUnavailable, reqID, nil)
 		return
 	}
@@ -43,7 +43,7 @@ func (s *Server) handleOnRoadList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, truncated, err := s.onroad.List(r.Context(), req.Filter)
+	rows, truncated, err := s.OnRoad.List(r.Context(), req.Filter)
 	if err != nil {
 		var invalid *query.ErrInvalidFilter
 		if errors.As(err, &invalid) {
