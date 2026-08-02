@@ -106,7 +106,7 @@ done
 m() { docker exec -i "$CONTAINER" mysql -uroot -ptest csm --default-character-set=utf8mb4 2>/dev/null; }
 q() { docker exec -i "$CONTAINER" mysql -uroot -ptest csm -N -B --default-character-set=utf8mb4 -e "$1" 2>/dev/null; }
 
-for f in 0001_init.up 0002_foreign_keys.up 0003_password_bcrypt.up 0004_sessions.up 0005_vw_onroad.up 0006_vw_storein_storeout.up; do
+for f in 0001_init.up 0002_foreign_keys.up 0003_password_bcrypt.up 0004_sessions.up 0005_vw_onroad.up 0006_vw_storein_storeout.up 0007_vw_speccar.up; do
   if m < "migrations/$f.sql"; then pass "apply $f"; else fail "apply $f"; fi
 done
 
@@ -114,7 +114,7 @@ check() { # name expected actual
   [[ "$3" == "$2" ]] && pass "$1 ($3)" || fail "$1: got $3, want $2"
 }
 check "16 base tables"        16 "$(q "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='csm' AND table_type='BASE TABLE';")"
-check "3 views"                3 "$(q "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='csm' AND table_type='VIEW';")"
+check "4 views"                4 "$(q "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='csm' AND table_type='VIEW';")"
 check "row_version on 15"     15 "$(q "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='csm' AND column_name='row_version';")"
 check "6 foreign keys"         6 "$(q "SELECT COUNT(*) FROM information_schema.table_constraints WHERE table_schema='csm' AND constraint_type='FOREIGN KEY';")"
 # Exactly 60: a bcrypt hash always is, and a wider column would accept
@@ -128,15 +128,15 @@ check "username idx non-uniq"  1 "$(q "SELECT non_unique FROM information_schema
 # Rolled back in REVERSE order, which is what golang-migrate does and what the
 # down files assume: each undoes only its own migration. Running 0001's down
 # alone leaves tbl_session behind, because that table belongs to 0004.
-for f in 0006_vw_storein_storeout.down 0005_vw_onroad.down 0004_sessions.down 0003_password_bcrypt.down 0002_foreign_keys.down 0001_init.down; do
+for f in 0007_vw_speccar.down 0006_vw_storein_storeout.down 0005_vw_onroad.down 0004_sessions.down 0003_password_bcrypt.down 0002_foreign_keys.down 0001_init.down; do
   m < "migrations/$f.sql"
 done
 check "full rollback"          0 "$(q "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='csm';")"  # tables AND views
 
-for f in 0001_init.up 0002_foreign_keys.up 0003_password_bcrypt.up 0004_sessions.up 0005_vw_onroad.up 0006_vw_storein_storeout.up; do
+for f in 0001_init.up 0002_foreign_keys.up 0003_password_bcrypt.up 0004_sessions.up 0005_vw_onroad.up 0006_vw_storein_storeout.up 0007_vw_speccar.up; do
   m < "migrations/$f.sql"
 done
-check "re-apply"              19 "$(q "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='csm';")"  # 16 tables + 3 views
+check "re-apply"              20 "$(q "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='csm';")"  # 16 tables + 4 views
 
 # The view column contracts are load-bearing: docs/mysql/schema.sql §3 records
 # the exact list each view must expose, name for name, because the report code
@@ -145,6 +145,7 @@ check "re-apply"              19 "$(q "SELECT COUNT(*) FROM information_schema.t
 check "vw_onroad 19 cols"     19 "$(q "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='csm' AND table_name='vw_onroad';")"
 check "vw_storein 42 cols"    42 "$(q "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='csm' AND table_name='vw_storein';")"
 check "vw_storeout 55 cols"   55 "$(q "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='csm' AND table_name='vw_storeout';")"
+check "vw_speccar 53 cols"    53 "$(q "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='csm' AND table_name='vw_speccar';")"
 
 # Guards the decisions baked into the schema. LAST_INSERT_ID(), not a
 # hardcoded uid: AUTO_INCREMENT moves as earlier checks insert and delete.

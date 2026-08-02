@@ -235,5 +235,18 @@
   "quarter.subtotal": "合计",
   "quarter.noSeries": "此年度暂无车系列数据。",
   "quarter.unsaved": "有未保存的修改。",
-  "quarter.discardConfirm": "有未保存的修改，切换后将丢失。是否继续？"
+  "quarter.discardConfirm": "有未保存的修改，切换后将丢失。是否继续？",
+  "speccar.kind": "特种车类型",
+  "speccar.profit": "利润",
+  "speccar.specProfit": "特殊利润",
+  "speccar.selector": "本表按「销售方式 = {{kind}}」筛选。",
+  "fit.consumer": "客户",
+  "fit.seller": "销售人",
+  "fit.date": "日期",
+  "fit.price": "金额",
+  "fit.remark": "备注",
+  "fit.add": "新增装修记录",
+  "fit.edit": "修改装修记录",
+  "fit.delete": "删除装修记录",
+  "fit.deleteBody": "确定要删除「{{consumer}}」的装修记录吗？此操作不可撤销。"
 }

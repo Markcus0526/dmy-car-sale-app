@@ -235,5 +235,18 @@
   "quarter.subtotal": "Total",
   "quarter.noSeries": "No car series recorded for this year.",
   "quarter.unsaved": "You have unsaved changes.",
-  "quarter.discardConfirm": "You have unsaved changes; switching will discard them. Continue?"
+  "quarter.discardConfirm": "You have unsaved changes; switching will discard them. Continue?",
+  "speccar.kind": "Special Type",
+  "speccar.profit": "Profit",
+  "speccar.specProfit": "Special Profit",
+  "speccar.selector": "Filtered to sales method “{{kind}}”.",
+  "fit.consumer": "Customer",
+  "fit.seller": "Salesperson",
+  "fit.date": "Date",
+  "fit.price": "Amount",
+  "fit.remark": "Remark",
+  "fit.add": "Add Fit-Out",
+  "fit.edit": "Edit Fit-Out",
+  "fit.delete": "Delete Fit-Out",
+  "fit.deleteBody": "Delete the fit-out record for “{{consumer}}”? This cannot be undone."
 }
