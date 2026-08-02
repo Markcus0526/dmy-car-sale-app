@@ -10,14 +10,14 @@ Newest entry first.
 
 ## Where things stand
 
-*Updated end of Day 27. Read this first; the entries below are the detail.*
+*Updated end of Day 34. Read this first; the entries below are the detail.*
 
 | | |
 |---|---|
 | **Phase** | Phase 1 (foundation) in progress. **Phase 0 not yet run** |
-| **Sessions logged** | 28 (Day 0–27) |
+| **Sessions logged** | 35 (Day 0–34) |
 | **Plan** | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — **158** sessions, **18** locked decisions. Q4 and Q5 answered; **Q10 opened** |
-| **Next action** | Store-in / transfer / dispatch **screens** over the movement service (the domain layer and API are done). Then slice 8's speccar + repair, and the quarterly grid. Decide **Q10**. **Phase 1 proper is blocked on Phase 0** |
+| **Next action** | Slice 8's remaining screens (speccar, 赠送装修) and the quarterly-target grid (§6.3). Then the runway is spent. Decide **Q10**. **Phase 1 proper is blocked on Phase 0** |
 
 **Green — verified and repeatable**
 
@@ -108,6 +108,70 @@ Newest entry first.
 **Next action**
 -
 ```
+
+---
+
+## Days 28–34 — 2026-08-02 — Slices 5, 6 and 7: stock screens end to end
+
+**Done**
+
+The screens over the day-24–27 movement service, and the two views they read.
+
+- `migrations/0006` — `vw_storein` (42 cols) and `vw_storeout` (55 cols),
+  provisional, reproducing the §3 contracts exactly.
+- `stock_repo.go` — both list repositories with allowlisted filters.
+- `handler_stock.go` — two list routes; the filter-error translation extracted
+  and shared with the on-road screen.
+- `LookupSelect` — a dropdown backed by any `tbl_basedata` domain. **This is
+  what slice 2 was for**: 库位, 进货途径, 批复人, 经手人 stop being free-text
+  boxes where every operator invents their own spelling.
+- `StoreInForm`, `StoreInPage` (with the transfer dialog), `StoreOutPage`.
+- Store-in action wired into the on-road grid, offered only while `inflag = 0`.
+
+**Judgement calls**
+
+1. **Both views LEFT JOIN**, same reasoning as `vw_onroad`: an INNER original
+   reproduced as LEFT shows extra rows, which is visible and reported; a LEFT
+   original reproduced as INNER loses rows silently.
+   `TestStoreInViewKeepsOrphanedRows` pins it.
+
+2. **`Expr1` is exposed as `NULL`.** It is an unnamed computed expression in
+   the original `vw_storeout` and its formula is not recoverable from this
+   repo. Exposed rather than dropped so the column name and arity survive —
+   anything consuming it gets an obviously wrong value instead of a subtly
+   wrong one, and the report code does not fail on a missing column.
+
+3. **The finance columns are deliberately absent from the list types.**
+   `propval`, `profitprop`, `profitval`, `specprofitval`, `outstoreprice`
+   belong to the finance engine (§6.1, blocked on Phase 0). Pulling them into
+   a stock list would put margin data on a screen that does not need it and
+   would have to be unpicked later.
+
+4. **`outflag` is filterable; `inflag` is not.** "What is still on the lot" is
+   the question the stock screen exists to answer. `inflag` is internal
+   lifecycle state a filter has no business reaching.
+
+5. **A `LookupSelect` value no longer in its domain is still shown.** Someone
+   deleted the entry after the record was written; silently dropping it would
+   blank a field the user never touched.
+
+**New guard: view column arity**
+
+`check.sh` now asserts 19 / 42 / 55 columns on the three views. The contracts
+are load-bearing — the report code selects against them by name — so a dropped
+or renamed column in a provisional definition would surface much later as a
+report that silently loses a field. All three match.
+
+**Verified**
+
+`./scripts/check.sh --db` → **ALL CHECKS PASS**. 5 new stock-view integration
+tests confirmed executing against real MySQL. Catalogues at **223** keys,
+parity holds.
+
+**What remains of the runway**
+
+Slice 8's speccar and 赠送装修 screens, and the quarterly-target grid (§6.3).
+Roughly 8–10 sessions. After that everything left needs the Phase 0 export.
 
 ---
 

@@ -1,7 +1,6 @@
 package http
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/Markcus0526/carsaleman/internal/auth"
@@ -45,19 +44,10 @@ func (s *Server) handleOnRoadList(w http.ResponseWriter, r *http.Request) {
 
 	rows, truncated, err := s.OnRoad.List(r.Context(), req.Filter)
 	if err != nil {
-		var invalid *query.ErrInvalidFilter
-		if errors.As(err, &invalid) {
-			// A bad filter is the client's mistake, not a server fault. The
-			// field name goes back so the UI can mark the offending row.
-			fields := map[string]string{}
-			if invalid.Field != "" {
-				fields[invalid.Field] = "INVALID_FORMAT"
-			}
-			apierr.Write(w, apierr.CodeValidationFailed, reqID, fields)
-			return
-		}
-		s.log.Error("listing on-road vehicles failed", "err", err, "request_id", reqID)
-		apierr.Write(w, apierr.CodeInternal, reqID, nil)
+		// A bad filter is the client's mistake, not a server fault, and the
+		// field name goes back so the UI can mark the offending row. Shared
+		// with the other list screens -- three copies of this would drift.
+		s.writeFilterError(w, reqID, err, "listing on-road vehicles")
 		return
 	}
 

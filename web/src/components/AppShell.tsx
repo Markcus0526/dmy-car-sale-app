@@ -8,6 +8,8 @@ import PlaceholderPage from "../pages/PlaceholderPage";
 import OnRoadPage from "../pages/OnRoadPage";
 import BaseDataPage from "../pages/BaseDataPage";
 import JournalPage from "../pages/JournalPage";
+import StoreInPage from "../pages/StoreInPage";
+import StoreOutPage from "../pages/StoreOutPage";
 import { PermissionProvider } from "../state/permissions";
 
 /** Flatten the tree to the leaves that own a route. */
@@ -113,6 +115,10 @@ export default function AppShell({ me, onLogout }: AppShellProps) {
                     <BaseDataPage />
                   ) : node.id === "journal" ? (
                     <JournalPage />
+                  ) : node.id === "storein" ? (
+                    <StoreInPage />
+                  ) : node.id === "storeout" ? (
+                    <StoreOutPage />
                   ) : (
                     <PlaceholderPage
                       labelKey={node.labelKey}
