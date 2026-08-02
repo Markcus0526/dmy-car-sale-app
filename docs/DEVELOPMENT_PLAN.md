@@ -421,9 +421,29 @@ needs nothing from Phase 0, and it turns the on-road form's raw `cartypeid` box 
 **Still blocked:** Phase 0. Fifteen sessions have routed around it. Phase 2's 22 sessions stay
 unsized, and the missing non-PK indexes in `0001_init.up.sql` remain unknown.
 
-**Runway.** Without Phase 0 the buildable work is roughly slices 2, 6, 8, 10 and the
-quarterly-target grid — about 30–35 sessions. Everything after that (28 procedures, 4 views,
-`cmd/migrate-data`, all 11 reports, all 7 statistics screens, and every equivalence test)
-needs the export. Rework risk compounds meanwhile: all of the above sits on an *inferred*
-schema with no real defaults, no non-PK indexes, unverified nullability, and one guessed
-join (`vw_onroad`).
+**Runway: SPENT as of day 43.** Every remaining item needs the Phase 0 export.
+
+| Phase | Budgeted | Delivered | Remaining | Est. actual |
+|---|---:|---:|---:|---:|
+| 0 — Ground truth | 2 | 0 | 2 | 2 |
+| 1 — Foundation | 16 | 11 | 5 | 4 |
+| 2 — Views and procedures | 22 | 0 | 22 | 25 |
+| 3 — Vertical slices | 70 | 55 | 15 | 10 |
+| 4 — Reports, statistics, charts | 37 | 2 | 35 | 33 |
+| 5 — Cutover | 11 | 0 | 11 | 9 |
+| **Total** | **158** | **68** | **90** | **~83** |
+
+44 actual sessions delivered 68 budgeted ones (~1.55×). That compression is applied only
+to phase 3's remainder — ordinary slice work. It is NOT applied to phase 2 (reverse-
+engineering 28 unseen procedures, which may run slower) or phase 4 (equivalence testing,
+which is iteration against a running comparison and does not compress).
+
+**Zero of those ~83 days can begin before Phase 0 runs.** The estimate is not "83 days
+from now"; it is "83 days from whenever the export happens". Add ~3 if Q10 is approved —
+the only substantial work available without the dump.
+
+**Compounding risk.** All 68 delivered sessions sit on a schema *inferred* from
+`CmsDB.xsd`: no real defaults, no non-PK indexes, unverified nullability, three guessed
+joins, one column (`Expr1`) whose formula is unrecoverable, and 107 NOT NULL columns with
+no known default. No business number has ever been compared against `csm`. Every place a
+guess was made carries a `TODO(phase0)` marker.

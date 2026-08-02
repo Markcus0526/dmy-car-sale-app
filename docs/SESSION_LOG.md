@@ -14,68 +14,77 @@ Newest entry first.
 
 | | |
 |---|---|
-| **Phase** | Phase 1 (foundation) in progress. **Phase 0 not yet run** |
+| **Phase** | Phase 3 substantially done out of order. **Phase 0 still not run** |
 | **Sessions logged** | 44 (Day 0–43) |
-| **Plan** | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — **158** sessions, **18** locked decisions. Q4 and Q5 answered; **Q10 opened** |
-| **Next action** | **THE RUNWAY IS SPENT.** Every remaining item needs the Phase 0 export against `csm` on `R-SEVEN64`. Decide **Q10** (audit trail — the only substantial work left that needs nothing from the dump) |
+| **Plan** | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — **158** budgeted, **68 delivered**, **90 remaining**. 18 locked decisions. Q4, Q5 answered; **Q3 and Q10 open** |
+| **Effort left** | **~80–85 working days (~4 months at 5/week)**, +3 if Q10 is approved |
+| **Next action** | **THE RUNWAY IS SPENT — zero of those 80 days can start today.** Run the Phase 0 export. The only thing buildable without it is **Q10** (~3 days) |
+
+### Cold-start checklist
+
+```bash
+export SP=<scratchpad>                 # Go lives here; session-scoped, may be gone
+export PATH="$SP/go/bin:$PATH" GOPATH="$SP/gopath" GOCACHE="$SP/gocache"
+./scripts/check.sh --db                # must print ALL CHECKS PASS before any change
+```
+
+Everything is committed and green as of `6e0b164`. **Seven commits are local only** —
+`origin/develop` is at `fcd8bff`. Nothing has been pushed.
 
 **Green — verified and repeatable**
 
-- **Go backend compiles, vets and tests clean under `-race`.** Go 1.26.5 installed to the
-  scratchpad (no sudo needed): `export PATH="$SP/go/bin:$PATH"`.
-- `web/` builds under strict TS; dev server serves; app catalogue 90/90.
-- String extraction: 1,447 literals → 1,316 TRANSLATE (**472 keys**) / 86 NEVER / 45 DROP /
-  **0 REVIEW**. Covers `.cs` literals *and* `.resx` grid captions.
-  Re-runnable: `node tools/extract-strings/extract.mjs`.
-- English catalogue: **472/472** translated, `verify.mjs` exit=0 on both catalogues.
-- Encoding conversion lossless: 201 files, 5,435 CJK codepoints, 0 failures.
-  `node tools/convert-encoding/convert.mjs` (add `--check` to verify only).
-- **Migrations apply to real MySQL 8.4** — 15 tables, 206 columns, 5 FKs, down leaves 0,
-  re-apply works. `row_version` blocks stale writes; utf8mb4 stores 4-byte chars intact.
-- **Legacy DES password verification matches two independent implementations**
-  (python-cryptography, openssl legacy provider) byte-for-byte.
-- **`auth.Service.Login`** — 22 tests: bcrypt path, legacy path + upgrade write, upgrade
-  failure does not fail login, unknown user indistinguishable, repo errors propagate.
-- **Migration 0003** (`password_bcrypt` + username index) verified on MySQL 8.4, down included.
-- **Migration 0004** (`tbl_session`) verified: unique token hash, FK guard, ON DELETE CASCADE.
-- **`auth.SessionService`** — idle + absolute timeouts, throttled touch, idempotent revoke,
-  immediate `RevokeAllForUser`.
-- **`store/mysql`** — 12 integration tests against real MySQL: Chinese round-trip, NULL
-  handling, atomic upgrade advancing `row_version`, unknown permission levels denying,
-  Shanghai wall-clock `DATETIME` round-trip.
-- **Working end-to-end login** — `POST /api/auth/login` → HttpOnly cookie → `GET /api/auth/me`
-  → menu filtered by real permissions. `POST /api/auth/logout` revokes server-side.
-- 49 permission keys match legacy `FrmMDIMain` exactly.
-- **`internal/query`** — parameterised filter builder replacing `FrmSearch`; 16 tests,
-  LIKE escaping verified against real MySQL.
-- **Reusable `DataGrid` + `FilterBar`** (TanStack headless, D5) — one grid for every list
-  screen, replacing eleven copy-pasted filter blocks.
-- **First real list screen**: on-road vehicles, filter → SQL → grid, permission-gated.
-  9 integration tests including literal `%`, Chinese filtering, inclusive date bounds.
-- **`./scripts/check.sh`** — every check in one command; `--db` adds the MySQL migration and
-  integration checks. **No CI**: GitHub Actions was removed by request, so nothing runs
-  automatically. Run this before committing.
+- **`./scripts/check.sh --db` → ALL CHECKS PASS.** One command, everything. **No CI**:
+  GitHub Actions was removed by request, so nothing runs automatically. Run it before
+  committing.
+- Go builds, vets and tests clean under `-race`. Web builds under strict TS.
+- **7 migrations** on real MySQL 8.4 — 16 tables, 4 views, 6 FKs. Down leaves 0; re-apply
+  gives 20. View column arity guarded: 19 / 42 / 55 / 53.
+- **`row_version` → 409 end to end** on every write path, with lost-update tests that
+  assert the *first* writer's value survives, not merely that an error was returned.
+- **Movement state machine** (§6.2): store-in / transfer / dispatch each one transaction
+  with a guarded flag. 16 integration tests, including 8 concurrent racers where exactly
+  one wins. `check.sh` asserts these really ran rather than skipping.
+- **Legacy DES verified against two independent implementations** byte-for-byte.
+- **Percentage rounding matches .NET** (half away from zero, not Go's half to even);
+  the test asserts Go's own formatter disagrees, so a Go change fails loudly.
+- i18n catalogues at **250 keys each, parity holds**. Encoding conversion lossless across
+  201 files. Route-wiring guard: all 8 screens exist in the menu tree.
+
+**Working screens (8)** — on-road, reference data, journal, store-in (+transfer),
+dispatch, quarterly targets, special vehicles, fit-out.
 
 **Amber — known debt, carried deliberately**
 
-- The 370-key extracted catalogue is reference material; it merges into
-  `web/src/locales/` per-slice as screens are built, not in bulk.
-- 8 concatenation call sites need merging into interpolated keys at port time
+- **Everything sits on an inferred schema.** 7 migrations, 4 views, 10 repositories built
+  from `CmsDB.xsd`, which cannot express defaults, indexes or checks. Three JOINs guessed,
+  one column (`Expr1`) filled with NULL, 107 NOT NULL columns with no known default.
+- **No business number has ever been compared against `csm`.** Mechanisms were verified
+  externally (DES, LIKE escaping, .NET rounding); business output never was.
+- 8 concatenation call sites need merging into interpolated keys
   (`docs/i18n/CONCATENATIONS.md`) — affects 6 of the 11 reports.
-- Go is installed to the **scratchpad**, which is session-scoped. CI has its own
-  toolchain, so this only affects local runs — re-extract if it disappears.
+- The 472-key extracted catalogue is reference material; it merges per-slice, not in bulk.
+- Go is in the **scratchpad**, which is session-scoped. Re-extract if it disappears.
+- `TODO(phase0)` markers mark every place a guess needs reconciling —
+  **14 of them**, in `migrations/0001` (defaults, nullability, indexes, checks,
+  collation), `0002`, `0005`, `0006`, `0007`, `movement/movement.go` (duplicate
+  `batchno` before adding a UNIQUE index) and `quarterstats_repo.go` (whether any
+  carseries has both a `type=1` and a non-`type=1` row).
+  `grep -rn "TODO(phase0)" --include=*.go --include=*.sql .`
 
 **Red — blocked on someone else**
 
-- **Phase 0 day 1**: run [mssql-export.sql](mssql-export.sql) against `csm` on
-  `R-SEVEN64`. The only external blocker. Gates Phase 2's sizing, which is the
-  ±20-session unknown in the whole plan. Gate: **28 proc files, 5 view files**.
+- **Phase 0**: run [mssql-export.sql](mssql-export.sql) against `csm` on `R-SEVEN64`.
+  Gate: **28 proc files, 5 view files**. Two days of work that now gates all 90 remaining.
+- **Q3** (§11.6): is the Excel import `.xls` or `.xlsx`? Blocks slice 4's last 2 sessions.
+- **Q10**: add a real audit trail? The README claims one; the code has none. New scope,
+  ~3 sessions, and the only substantial work available without the dump.
 
 **Decisions made without business input** — reversible, see DEVELOPMENT_PLAN §2.1/§2.2
 
 - **D13** (§10.2 zero interest past extension): assessed a bug, ported faithfully behind a
   default-`false` flag.
 - **D14** (§11.2): decimal, ±0.01/row tolerance.
+- **D17** session policy, **D18** no database i18n.
 
 **Rules that make this worth keeping:**
 
