@@ -110,5 +110,16 @@
   "onroad.col.colorname": "Colour",
   "onroad.col.carstate": "Status",
   "onroad.col.inprice": "Cost Price",
-  "grid.truncated": "Showing the first results only. Narrow your search to see the rest."
+  "grid.truncated": "Showing the first results only. Narrow your search to see the rest.",
+  "common.saving": "Saving…",
+  "onroad.form.addTitle": "Add On-Road Vehicle",
+  "onroad.form.editTitle": "Edit On-Road Vehicle",
+  "onroad.form.reload": "Reload",
+  "onroad.col.cartypeid": "Car Type ID",
+  "onroad.col.cartype": "Car Type",
+  "onroad.col.colorcode": "Colour Code",
+  "onroad.col.subsets": "Trim",
+  "onroad.col.insidesetcode": "Interior Code",
+  "onroad.col.insidesetname": "Interior",
+  "onroad.col.property": "Property"
 }

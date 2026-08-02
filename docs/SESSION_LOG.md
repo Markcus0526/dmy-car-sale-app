@@ -10,14 +10,14 @@ Newest entry first.
 
 ## Where things stand
 
-*Updated end of Day 18 (one week). Read this first; the entries below are the detail.*
+*Updated end of Day 19. Read this first; the entries below are the detail.*
 
 | | |
 |---|---|
 | **Phase** | Phase 1 (foundation) in progress. **Phase 0 not yet run** |
-| **Sessions logged** | 19 (Day 0–18) |
+| **Sessions logged** | 20 (Day 0–19) |
 | **Plan** | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — **158** sessions, **18** locked decisions |
-| **Next action** | Slice 4 continues: on-road create/edit modal, then Excel import (needs Q3 answered). **Phase 1 proper is blocked on Phase 0** |
+| **Next action** | Slice 2 — reference data (`tbl_basedata`), which turns the raw `cartypeid` box into a picker. Excel import still needs Q3. **Phase 1 proper is blocked on Phase 0** |
 
 **Green — verified and repeatable**
 
@@ -108,6 +108,88 @@ Newest entry first.
 **Next action**
 -
 ```
+
+---
+
+## Day 19 — 2026-08-02 — Slice 4: on-road create/edit modal, `row_version` end to end
+
+**Done**
+
+Slice 4's write path, and with it the two patterns every later screen inherits.
+
+*Backend*
+
+- `internal/store/mysql/onroad_write.go` — `Get` / `Create` / `Update`, plus
+  `ErrVersionConflict` and `ErrNotFound`.
+- `internal/http/validate.go` — a field validator emitting CODES (`REQUIRED`,
+  `TOO_LONG`, `INVALID_FORMAT`), never prose.
+- `internal/http/handler_onroad_write.go` — `GET /api/onroad/{id}`,
+  `POST /api/onroad`, `PATCH /api/onroad/{id}`.
+
+*Frontend*
+
+- `components/Modal.tsx` — focus move-in, focus restore, Escape, Tab trap.
+- `components/FormField.tsx` — label + input + resolved field error.
+- `pages/OnRoadForm.tsx` — the create/edit modal.
+- `state/permissions.tsx` — `useCanWrite`, deny-by-default.
+- 11 new i18n keys; both catalogues at **123**, parity holds.
+
+**Judgement calls, and why**
+
+1. **`row_version` is guarded in the `WHERE` clause, not by read-then-compare.**
+   A read-then-compare has a race between the read and the write — precisely the
+   lost update it is meant to prevent. One atomic statement has none.
+
+2. **Zero affected rows is disambiguated.** A stale version and a deleted row both
+   produce zero. A follow-up `EXISTS` tells them apart, so the client gets 409 or
+   404 — which lead a user to do different things (reload vs. go back).
+
+3. **A missing `rowVersion` is rejected outright (400), not defaulted.** Treating
+   absent as "no opinion" and writing anyway makes the guard opt-in, and an opt-in
+   lost-update guard is not a guard.
+
+4. **The modal re-reads the row on open** instead of editing the grid's cached copy.
+   A grid row can be minutes old; opening against it means the user's *first* save
+   conflicts on a change they never saw.
+
+5. **Decimals use `type="text"`, not `type="number"`.** A number input hands back a
+   JS number, and 148 decimal columns cannot survive float64 (§11.2). `DECIMAL(10,2)`
+   precision is checked on the digit string — parsing to float to measure it would
+   reintroduce the very loss the string representation exists to avoid.
+
+6. **Validation runs before the "is a database configured" check.** A malformed
+   request is malformed either way, and answering it with 503 invites a retry that
+   can never succeed. This was caught by a failing test, not by review.
+
+7. **`Create` owns `inflag`/`inkind`.** They are the store-in state machine (§6.2).
+   Accepting them from a form would let a client skip the movement transaction —
+   which is why the write model is a narrower type than the read model, not the
+   same struct reused.
+
+8. **Write routes require `读写`; reads require `只读`.** Enforced per route. The UI
+   hides the buttons as a courtesy; §10.8 records that the legacy app hid menu items
+   and enforced nothing behind them.
+
+**Verified**
+
+`./scripts/check.sh --db` → **ALL CHECKS PASS**. 6 new store tests confirmed running
+against real MySQL (`-v`, not skipped), 6 new handler tests, 8 new validator tests.
+
+The one that matters is `TestOnRoadUpdateRejectsStaleVersion`: it asserts not only
+that the stale write is refused, but that the *first* user's value survives and the
+version did not move. Asserting on the error alone would pass even if the write had
+gone through.
+
+**Known stopgap**
+
+`cartypeid` is a raw number box. It becomes a picker in slice 2, which is also what
+supplies `carseries` and the default cost price. Flagged in the source rather than
+left to be discovered — typing a foreign key by hand is not shippable.
+
+**Next action**
+
+Slice 2 — reference data (`tbl_basedata`, 17 domains). It is a base table, so it
+needs nothing from Phase 0, and it unblocks dropdowns on every screen after this one.
 
 ---
 

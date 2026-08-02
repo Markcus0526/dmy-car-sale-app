@@ -5,6 +5,8 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { ApiError, NetworkError, listOnRoad, type OnRoadRow } from "../api/client";
 import DataGrid from "../components/DataGrid";
 import FilterBar from "../components/FilterBar";
+import OnRoadFormModal from "./OnRoadForm";
+import { useCanWrite } from "../state/permissions";
 import { formatDecimal, asDecimal } from "../types/decimal";
 import type { Filter, FilterField } from "../types/filter";
 
@@ -25,8 +27,22 @@ const FILTER_FIELDS: FilterField[] = [
   { field: "billdate", labelKey: "onroad.col.billdate", kind: "date" },
 ];
 
+/**
+ * The permission key for this screen, exactly as stored in
+ * tbl_permission.fieldname. Chinese because the DATA is Chinese — an opaque
+ * authorization key, never rendered and never translated.
+ */
+const PERMISSION_KEY = "在途/未提车辆管理";
+
+/** undefined = closed; null = creating; a number = editing that uid. */
+type Editing = undefined | null | number;
+
 export default function OnRoadPage() {
   const { t, i18n } = useTranslation();
+  const canWrite = useCanWrite(PERMISSION_KEY);
+  const [editing, setEditing] = useState<Editing>(undefined);
+  /** The filter the grid currently shows, so a save can re-run it. */
+  const [lastFilter, setLastFilter] = useState<Filter>({ conditions: [] });
 
   const [rows, setRows] = useState<OnRoadRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,6 +52,7 @@ export default function OnRoadPage() {
   const search = useCallback(async (filter: Filter) => {
     setLoading(true);
     setErrorKey(null);
+    setLastFilter(filter);
     try {
       const res = await listOnRoad(filter);
       setRows(res.rows);
@@ -83,7 +100,19 @@ export default function OnRoadPage() {
 
   return (
     <section className="page page--wide">
-      <h1 className="page__title">{t("menu.movement.onroad")}</h1>
+      <div className="page__header">
+        <h1 className="page__title">{t("menu.movement.onroad")}</h1>
+        {/*
+          Hidden for read-only users as a courtesy, not as a control. The
+          server rejects the POST regardless — §10.8 records that the legacy
+          app greyed out menu items and enforced nothing behind them.
+        */}
+        {canWrite && (
+          <button className="btn btn--primary" onClick={() => setEditing(null)}>
+            {t("common.add")}
+          </button>
+        )}
+      </div>
 
       <FilterBar fields={FILTER_FIELDS} onSearch={(f) => void search(f)} busy={loading} />
 
@@ -99,7 +128,25 @@ export default function OnRoadPage() {
         <div className="notice">{t("grid.truncated")}</div>
       )}
 
-      <DataGrid columns={columns} rows={rows} loading={loading} emptyKey="grid.empty" />
+      <DataGrid
+        columns={columns}
+        rows={rows}
+        loading={loading}
+        emptyKey="grid.empty"
+        // Read-only users get no row affordance at all, rather than a click
+        // that opens a form they cannot save.
+        onRowClick={canWrite ? (row) => setEditing(row.uid) : undefined}
+      />
+
+      {editing !== undefined && (
+        <OnRoadFormModal
+          uid={editing ?? undefined}
+          onClose={() => setEditing(undefined)}
+          // Re-run the same filter rather than resetting it: a user who
+          // searched, edited, and lost their search would have to redo it.
+          onSaved={() => void search(lastFilter)}
+        />
+      )}
     </section>
   );
 }

@@ -384,7 +384,7 @@ remember is the most expensive way to lose a day.
 
 ## 12. Progress
 
-*Updated end of Day 13. Work has run out of plan order because Phase 0 is blocked — see
+*Updated end of Day 19. Work has run out of plan order because Phase 0 is blocked — see
 [SESSION_LOG.md](SESSION_LOG.md) for the per-session detail.*
 
 | Phase | Sessions | Status |
@@ -392,7 +392,7 @@ remember is the most expensive way to lose a day.
 | 0 — Ground truth | 2 | **BLOCKED** — needs the live `csm` database |
 | 1 — Foundation | 16 | **Partial.** Days 3–7, 13–18 done. Days 8–12 (`cmd/migrate-data`) blocked on Phase 0 |
 | 2 — Views and procedures | 22 | Not started — blocked on Phase 0 |
-| 3 — Vertical slices | 70 | **Slice 1 done.** Slice 3 backend done (`internal/query`); its grid/filter UI remains |
+| 3 — Vertical slices | 70 | **Slices 1 and 3 done.** Slice 4: list + create/edit done; Excel import needs Q3 |
 | 4 — Reports, statistics, charts | 37 | Not started |
 | 5 — Cutover | 11 | Not started |
 
@@ -409,10 +409,20 @@ remember is the most expensive way to lose a day.
 | Sessions (D17), login service, `store/mysql` | `internal/auth`, `internal/store/mysql` |
 | Working end-to-end login with permission-filtered nav | all of the above |
 | Parameterised filter replacing `FrmSearch` | `internal/query` |
+| Shared data grid + filter bar (replaces C1FlexGrid) | `web/src/components` |
+| On-road list, create/edit modal, `row_version` → 409 | `internal/store/mysql`, `web/src/pages` |
+| Modal / form-field / field-validation pattern for the ~25 `*Add`/`*Edit` screens | `web/src/components`, `internal/http/validate.go` |
 | `./scripts/check.sh` (replaces CI) | `scripts/` |
 
-**Next action:** the React data grid + filter UI on top of `internal/query`, finishing slice 3
-and unblocking slices 4–8.
+**Next action:** slice 2 — reference data (`tbl_basedata`, 17 domains). A base table, so it
+needs nothing from Phase 0, and it turns the on-road form's raw `cartypeid` box into a picker.
 
-**Still blocked:** Phase 0. Fourteen sessions have routed around it. Phase 2's 22 sessions stay
+**Still blocked:** Phase 0. Fifteen sessions have routed around it. Phase 2's 22 sessions stay
 unsized, and the missing non-PK indexes in `0001_init.up.sql` remain unknown.
+
+**Runway.** Without Phase 0 the buildable work is roughly slices 2, 6, 8, 10 and the
+quarterly-target grid — about 30–35 sessions. Everything after that (28 procedures, 4 views,
+`cmd/migrate-data`, all 11 reports, all 7 statistics screens, and every equivalence test)
+needs the export. Rework risk compounds meanwhile: all of the above sits on an *inferred*
+schema with no real defaults, no non-PK indexes, unverified nullability, and one guessed
+join (`vw_onroad`).
