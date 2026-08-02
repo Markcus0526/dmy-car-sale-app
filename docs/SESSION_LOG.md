@@ -10,14 +10,14 @@ Newest entry first.
 
 ## Where things stand
 
-*Updated end of Day 23. Read this first; the entries below are the detail.*
+*Updated end of Day 27. Read this first; the entries below are the detail.*
 
 | | |
 |---|---|
 | **Phase** | Phase 1 (foundation) in progress. **Phase 0 not yet run** |
-| **Sessions logged** | 24 (Day 0–23) |
+| **Sessions logged** | 28 (Day 0–27) |
 | **Plan** | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — **158** sessions, **18** locked decisions. Q4 and Q5 answered; **Q10 opened** |
-| **Next action** | Decide **Q10** (add a real audit trail?), then slice 6 (`tbl_storechange`) or the quarterly grid. Excel import still needs Q3. **Phase 1 proper is blocked on Phase 0** |
+| **Next action** | Store-in / transfer / dispatch **screens** over the movement service (the domain layer and API are done). Then slice 8's speccar + repair, and the quarterly grid. Decide **Q10**. **Phase 1 proper is blocked on Phase 0** |
 
 **Green — verified and repeatable**
 
@@ -108,6 +108,93 @@ Newest entry first.
 **Next action**
 -
 ```
+
+---
+
+## Days 24–27 — 2026-08-02 — The vehicle lifecycle (§6.2), slices 5/6/7/10
+
+**Done**
+
+`internal/domain/movement` — the state machine every remaining movement screen
+sits on. Store-in, transfer, dispatch and history, plus five API routes, the
+history viewer UI, and 16 integration tests against real MySQL.
+
+This is the §6.2 work the plan calls *highest business value*, and the one place
+it says the port should deliberately **not** be faithful.
+
+**What the original did, and what this does instead**
+
+Each transition was 2–3 independent adapter `Update()` calls with **no
+transaction** (FrmStoreInAddMan.cs:318-395). A crash between them left a vehicle
+half-moved — flagged as stored with no stock row, or a stock row with the flag
+never set. Here every transition is one transaction with a guarded flag update,
+so a double submit fails loudly instead of storing the same car twice.
+
+`TestStoreInRollsBackEverythingOnFailure` pins that: it forces a failure *after*
+the flag update has already succeeded inside the transaction, then asserts the
+flag, the stock row and the movement row are all absent.
+
+`TestConcurrentStoreInStoresExactlyOnce` races eight goroutines at one vehicle;
+exactly one wins and exactly one `tbl_storein` row exists.
+
+**Three legacy defects fixed rather than ported**
+
+1. **`changeid` was `tbl_storechange.Rows.Count`** — the row count of the
+   *client's cached DataTable*, at six call sites. Two clients mint the same id,
+   it moves backwards when rows are deleted, and it depends on what the client
+   happened to have loaded. Now `MAX(changeid)+1` allocated inside the
+   transaction. Safe because nothing queries on it — every read site just
+   displays it.
+
+2. **`batchno` used .NET's `hh`, which is 12-HOUR.** 09:00 and 21:00 produced
+   the identical string, silently merging two deliveries twelve hours apart.
+   Now `HH`, generated server-side, in `Asia/Shanghai`.
+
+3. **Transfers left `tbl_storein.storeplace` stale** on some paths — the history
+   said the car had moved while the stock list still pointed at the old bay.
+   Now both move in one transaction.
+
+**Where I did NOT follow the plan**
+
+§6.6 recommends a `UNIQUE` index on `batchno`. **Not applied.** `batchno` is
+per-row (`txtbatchno` binds to the BindingSource's *current* row), the legacy
+generator has one-second resolution, and an operator clicking through ten
+vehicles in a batch can easily mint ten identical numbers — so duplicates are
+likely to already exist. Adding the constraint before the dump is examined would
+fail the migration on live data. Same reasoning as the deliberately non-unique
+username index. `TODO(phase0)` records what to count.
+
+**Slice 10 delivered, correctly specified**
+
+`HistoryModal` reads `tbl_storechange` — which is what `FrmActionHis` actually
+shows, per the day-23 correction. Rendered as a timeline rather than the
+original's monospace textbox, which does not wrap, select cleanly, or read
+aloud.
+
+**Two bugs in my own check script, both caught by a negative control**
+
+`scripts/check.sh` now names the movement package explicitly — `go test ./...`
+runs it as a no-op without a DSN, so the lifecycle would have been unverified
+while the suite still printed PASS. The guard that asserts the tests *really
+ran* failed twice for reasons worth recording:
+
+1. `go test` served a **cached** result, so no `--- PASS` line was printed.
+   Needs `-count=1`.
+2. `set -o pipefail` + `grep -q`: `-q` exits at the first match and closes the
+   pipe, `go test` dies of SIGPIPE, and pipefail propagates that as the
+   pipeline's status. The command passed standalone and failed inside the
+   script. Now captured to a variable first.
+
+**Verified**
+
+`./scripts/check.sh --db` → **ALL CHECKS PASS**, including the new
+"movement tests really executed (not skipped)" assertion. 16 movement
+integration tests, 6 handler tests. Catalogues at **194** keys, parity holds.
+
+**Next action**
+
+The store-in / transfer / dispatch **screens**. The domain layer and API are
+done and tested; what remains is form UI over them.
 
 ---
 

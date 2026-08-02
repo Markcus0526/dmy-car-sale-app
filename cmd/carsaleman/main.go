@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Markcus0526/carsaleman/internal/auth"
+	"github.com/Markcus0526/carsaleman/internal/domain/movement"
 	apphttp "github.com/Markcus0526/carsaleman/internal/http"
 	"github.com/Markcus0526/carsaleman/internal/platform/config"
 	"github.com/Markcus0526/carsaleman/internal/platform/logging"
@@ -45,6 +46,7 @@ func run() error {
 		basedata *storemysql.BaseDataRepo
 		cartype  *storemysql.CarTypeRepo
 		journal  *storemysql.JournalRepo
+		moves    *movement.Service
 	)
 	if cfg.MySQLDSN != "" {
 		dbCtx, cancelDB := context.WithTimeout(context.Background(), 15*time.Second)
@@ -61,6 +63,13 @@ func run() error {
 		basedata = storemysql.NewBaseDataRepo(db)
 		cartype = storemysql.NewCarTypeRepo(db)
 		journal = storemysql.NewJournalRepo(db)
+		// Asia/Shanghai, not UTC: batch numbers embed a wall-clock timestamp
+		// that staff read and quote (§6.6).
+		shanghai, err := time.LoadLocation("Asia/Shanghai")
+		if err != nil {
+			return err
+		}
+		moves = movement.New(db, time.Now, shanghai)
 		log.Info("database connected")
 	} else {
 		log.Warn("no CARSALEMAN_MYSQL_DSN: authenticated routes are unavailable")
@@ -70,7 +79,7 @@ func run() error {
 		Addr: cfg.Addr,
 		Handler: apphttp.NewServer(cfg, log, authSvc, apphttp.Deps{
 			Sessions: sessions, OnRoad: onroad, BaseData: basedata,
-			CarType: cartype, Journal: journal,
+			CarType: cartype, Journal: journal, Movement: moves,
 		}).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}

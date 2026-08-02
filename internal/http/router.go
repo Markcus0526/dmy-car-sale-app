@@ -12,6 +12,7 @@ import (
 	"net/http"
 
 	"github.com/Markcus0526/carsaleman/internal/auth"
+	"github.com/Markcus0526/carsaleman/internal/domain/movement"
 	"github.com/Markcus0526/carsaleman/internal/http/apierr"
 	"github.com/Markcus0526/carsaleman/internal/platform/config"
 	storemysql "github.com/Markcus0526/carsaleman/internal/store/mysql"
@@ -40,6 +41,7 @@ type Deps struct {
 	BaseData *storemysql.BaseDataRepo
 	CarType  *storemysql.CarTypeRepo
 	Journal  *storemysql.JournalRepo
+	Movement *movement.Service
 }
 
 // NewServer wires the HTTP layer.
@@ -65,6 +67,7 @@ func (s *Server) Handler() http.Handler {
 	s.registerBaseData(mux)
 	s.registerCarType(mux)
 	s.registerJournal(mux)
+	s.registerMovement(mux)
 
 	// Catch-all. Without it, unmatched routes fall through to the stdlib's
 	// "404 page not found" plaintext, the client's JSON parse fails, and every
