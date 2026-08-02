@@ -45,6 +45,8 @@ type Deps struct {
 	StoreInList  *storemysql.StoreInRepo
 	StoreOutList *storemysql.StoreOutRepo
 	QuarterStats *storemysql.QuarterStatsRepo
+	SpecCar      *storemysql.SpecCarRepo
+	Fit          *storemysql.FitRepo
 }
 
 // NewServer wires the HTTP layer.
@@ -73,6 +75,7 @@ func (s *Server) Handler() http.Handler {
 	s.registerMovement(mux)
 	s.registerStock(mux)
 	s.registerQuarterStats(mux)
+	s.registerSlice8(mux)
 
 	// Catch-all. Without it, unmatched routes fall through to the stdlib's
 	// "404 page not found" plaintext, the client's JSON parse fails, and every

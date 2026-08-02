@@ -50,6 +50,8 @@ func run() error {
 		stockIn  *storemysql.StoreInRepo
 		stockOut *storemysql.StoreOutRepo
 		quarters *storemysql.QuarterStatsRepo
+		speccar  *storemysql.SpecCarRepo
+		fit      *storemysql.FitRepo
 	)
 	if cfg.MySQLDSN != "" {
 		dbCtx, cancelDB := context.WithTimeout(context.Background(), 15*time.Second)
@@ -76,6 +78,8 @@ func run() error {
 		stockIn = storemysql.NewStoreInRepo(db)
 		stockOut = storemysql.NewStoreOutRepo(db)
 		quarters = storemysql.NewQuarterStatsRepo(db)
+		speccar = storemysql.NewSpecCarRepo(db)
+		fit = storemysql.NewFitRepo(db)
 		log.Info("database connected")
 	} else {
 		log.Warn("no CARSALEMAN_MYSQL_DSN: authenticated routes are unavailable")
@@ -87,6 +91,7 @@ func run() error {
 			Sessions: sessions, OnRoad: onroad, BaseData: basedata,
 			CarType: cartype, Journal: journal, Movement: moves,
 			StoreInList: stockIn, StoreOutList: stockOut, QuarterStats: quarters,
+			SpecCar: speccar, Fit: fit,
 		}).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}

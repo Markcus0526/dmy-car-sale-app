@@ -11,6 +11,8 @@ import JournalPage from "../pages/JournalPage";
 import StoreInPage from "../pages/StoreInPage";
 import StoreOutPage from "../pages/StoreOutPage";
 import QuarterTargetPage from "../pages/QuarterTargetPage";
+import SpecCarPage from "../pages/SpecCarPage";
+import FitPage from "../pages/FitPage";
 import { PermissionProvider } from "../state/permissions";
 
 /** Flatten the tree to the leaves that own a route. */
@@ -122,6 +124,10 @@ export default function AppShell({ me, onLogout }: AppShellProps) {
                     <StoreOutPage />
                   ) : node.id === "quarter-target" ? (
                     <QuarterTargetPage />
+                  ) : node.id === "speccar" ? (
+                    <SpecCarPage />
+                  ) : node.id === "repair" ? (
+                    <FitPage />
                   ) : (
                     <PlaceholderPage
                       labelKey={node.labelKey}

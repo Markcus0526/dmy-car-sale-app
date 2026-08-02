@@ -10,14 +10,14 @@ Newest entry first.
 
 ## Where things stand
 
-*Updated end of Day 39. Read this first; the entries below are the detail.*
+*Updated end of Day 43. Read this first; the entries below are the detail.*
 
 | | |
 |---|---|
 | **Phase** | Phase 1 (foundation) in progress. **Phase 0 not yet run** |
-| **Sessions logged** | 40 (Day 0–39) |
+| **Sessions logged** | 44 (Day 0–43) |
 | **Plan** | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — **158** sessions, **18** locked decisions. Q4 and Q5 answered; **Q10 opened** |
-| **Next action** | Slice 8's remaining screens (特种车统计表, 赠送装修) — the last unblocked work, ~4 sessions. Then the runway is **spent** and everything left needs Phase 0. Decide **Q10** |
+| **Next action** | **THE RUNWAY IS SPENT.** Every remaining item needs the Phase 0 export against `csm` on `R-SEVEN64`. Decide **Q10** (audit trail — the only substantial work left that needs nothing from the dump) |
 
 **Green — verified and repeatable**
 
@@ -108,6 +108,89 @@ Newest entry first.
 **Next action**
 -
 ```
+
+---
+
+## Days 40–43 — 2026-08-02 — Slice 8 complete; the runway is spent
+
+**Done**
+
+The last two unblocked screens.
+
+- `migrations/0007` — `vw_speccar` (53 cols), provisional, unfiltered.
+- `speccar_repo.go`, `fit_repo.go`, `handler_slice8.go`, five routes.
+- `SpecCarPage`, `FitPage`.
+
+**Finding: "special car" does not mean what the screen name says**
+
+`FrmSpecCar` selects by **`salekind = '大客户'`** (key-account sales), not by
+`carspeckind` ([FrmSpecCar.cs:327, :331](../CarSaleMan/CarSaleMan/FrmSpecCar.cs#L327)).
+`carspeckind` is carried as data but is not the selector. Anyone reading the
+column names would get this backwards.
+
+**Two latent bugs in FrmSpecCar, recorded not ported**
+
+1. **`vwSpeccarBindingSource.Filter + "AND salekind = '大客户'"`** — no
+   separating space. With a non-empty search filter this concatenates into
+   `...'X'AND salekind = ...`. The try/catch swallows the parse failure, so
+   opening the editor after a search fails silently.
+2. **`frm.selRowIndex = gridSpecCar.Row - 1`** is an index into the *unfiltered*
+   grid, but `filterText` restricts the set the editor navigates. When the grid
+   holds rows that are not `大客户`, index N in the grid is not index N in the
+   filtered set — **the edit dialog can open the wrong record.**
+
+Neither is reproduced. The port has no index-into-a-filtered-view concept at
+all: rows carry their own uid.
+
+**Judgement: `vw_speccar` is left unfiltered**
+
+Its name says it should filter, and the edit dialog re-applies the predicate —
+but `LoadTableFromDB` clears the binding filter and Fills the whole view
+(lines 89-91), then shows every row. If the view filtered, that grid would
+already be special-cars-only.
+
+Unfiltered, same principle as 0005/0006: filtering wrongly loses rows silently,
+not filtering wrongly shows extra rows visibly. The predicate is instead an
+ordinary filter condition the UI defaults and the user can remove, and the
+server sends the selector value rather than the client hardcoding it.
+
+**`tbl_fit` has no link to a vehicle**
+
+No foreign key to a car or a sale — a fit-out is recorded against a customer
+*name*. Left alone: adding a link would be a schema change to a table the
+reports read, and the correct relationship is not recoverable from this repo.
+
+**NULL money stays NULL** across both screens. "Not recorded" and "zero" are
+different facts and only one belongs in a margin total.
+
+**Verified**
+
+`./scripts/check.sh --db` → **ALL CHECKS PASS**, now including `vw_speccar 53
+cols`. 6 new store tests. Catalogues at **250** keys, parity holds. The route
+guard confirms all 8 wired screens exist in the menu tree.
+
+---
+
+## THE RUNWAY IS SPENT
+
+Every remaining item needs the Phase 0 export. Nothing else is buildable:
+
+| Blocked | Needs |
+|---|---|
+| Phase 2 — 28 procedures, 4 remaining views | the dump |
+| `cmd/migrate-data` | live MSSQL |
+| Phase 4 — 11 reports, 7 statistics, 5 charts | the procedures |
+| Every equivalence test | a running legacy system |
+| Phase 5 — cutover | all of the above |
+| Excel import (slice 4) | **Q3** — `.xls` or `.xlsx`? |
+
+The **one** substantial thing left that needs nothing from the dump is **Q10**:
+adding a real audit trail (~3 sessions). It is new scope and awaits a decision.
+
+**What has been built without ever comparing a number to the real system:**
+7 migrations, 4 views, 10 repositories, 2 domain packages, 8 screens, ~40 API
+routes. All verified against my reading of the C# source and against a real
+MySQL — never against `csm`. That is the standing risk.
 
 ---
 

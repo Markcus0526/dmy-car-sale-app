@@ -385,7 +385,7 @@ remember is the most expensive way to lose a day.
 
 ## 12. Progress
 
-*Updated end of Day 39. Work has run out of plan order because Phase 0 is blocked — see
+*Updated end of Day 43. **The unblocked runway is now spent.** See
 [SESSION_LOG.md](SESSION_LOG.md) for the per-session detail.*
 
 | Phase | Sessions | Status |
@@ -393,7 +393,7 @@ remember is the most expensive way to lose a day.
 | 0 — Ground truth | 2 | **BLOCKED** — needs the live `csm` database |
 | 1 — Foundation | 16 | **Partial.** Days 3–7, 13–18 done. Days 8–12 (`cmd/migrate-data`) blocked on Phase 0 |
 | 2 — Views and procedures | 22 | Not started — blocked on Phase 0 |
-| 3 — Vertical slices | 70 | **Slices 1, 2, 3, 6, 10 done.** 5 and 7 done bar Excel/finance columns; 4 needs Q3 for Excel; 8 partial (journal) |
+| 3 — Vertical slices | 70 | **Slices 1, 2, 3, 6, 8, 10 done.** 5 and 7 done bar the finance columns; 4 needs Q3 for Excel; 9 (finance) needs Phase 2 |
 | 4 — Reports, statistics, charts | 37 | Not started |
 | 5 — Cutover | 11 | Not started |
 
