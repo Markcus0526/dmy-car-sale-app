@@ -171,3 +171,60 @@ export function listOnRoad(filter: Filter): Promise<OnRoadListResponse> {
     body: JSON.stringify({ filter }),
   });
 }
+
+/** The writable subset of a vehicle. Narrower than OnRoadRow on purpose. */
+export interface OnRoadForm {
+  billno: string;
+  billdate: string;
+  vin: string;
+  engineno: string;
+  cartypeid: number;
+  cartype: string;
+  carname: string;
+  colorcode: string;
+  colorname: string;
+  subsets: string;
+  insidesetcode: string;
+  insidesetname: string;
+  carstate: string;
+  property: string;
+  /** Decimal string, or "" for NULL. Never a number — see types/decimal.ts. */
+  inprice: string;
+  /**
+   * The version last read. Required on update; the server rejects a missing
+   * or zero value rather than writing anyway, so the concurrency check cannot
+   * be skipped by omitting it.
+   */
+  rowVersion: number;
+}
+
+export interface OnRoadDetail {
+  row: OnRoadRow;
+  /** Concurrency token. Kept beside the row, not inside it — never rendered. */
+  rowVersion: number;
+}
+
+/**
+ * Read one vehicle for the edit modal.
+ *
+ * The modal always re-reads rather than editing the row cached in the grid: a
+ * grid row can be minutes old, and opening against it means the user's first
+ * save conflicts on a change they never saw.
+ */
+export function getOnRoad(uid: number): Promise<OnRoadDetail> {
+  return apiFetch<OnRoadDetail>(`/api/onroad/${uid}`);
+}
+
+export function createOnRoad(form: OnRoadForm): Promise<OnRoadDetail> {
+  return apiFetch<OnRoadDetail>("/api/onroad", {
+    method: "POST",
+    body: JSON.stringify(form),
+  });
+}
+
+export function updateOnRoad(uid: number, form: OnRoadForm): Promise<OnRoadDetail> {
+  return apiFetch<OnRoadDetail>(`/api/onroad/${uid}`, {
+    method: "PATCH",
+    body: JSON.stringify(form),
+  });
+}

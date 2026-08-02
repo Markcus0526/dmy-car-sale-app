@@ -110,5 +110,16 @@
   "onroad.col.colorname": "颜色",
   "onroad.col.carstate": "状态名称",
   "onroad.col.inprice": "进价",
-  "grid.truncated": "仅显示部分结果，请缩小查询范围以查看其余记录。"
+  "grid.truncated": "仅显示部分结果，请缩小查询范围以查看其余记录。",
+  "common.saving": "保存中…",
+  "onroad.form.addTitle": "新增在途车辆",
+  "onroad.form.editTitle": "修改在途车辆",
+  "onroad.form.reload": "重新读取",
+  "onroad.col.cartypeid": "车型编号",
+  "onroad.col.cartype": "车型",
+  "onroad.col.colorcode": "颜色编码",
+  "onroad.col.subsets": "配置",
+  "onroad.col.insidesetcode": "内饰编码",
+  "onroad.col.insidesetname": "内饰",
+  "onroad.col.property": "属性"
 }

@@ -74,7 +74,20 @@ func (s *Server) handleOnRoadList(w http.ResponseWriter, r *http.Request) {
 // requirePermission is the §10.8 fix: the legacy app only greyed out menu
 // items, so anyone who could reach the network could issue the operation.
 func (s *Server) registerOnRoad(mux *http.ServeMux) {
+	// Reads need 只读 or better.
 	mux.Handle("POST /api/onroad/list",
 		s.requireAuth(s.requirePermission(auth.PermOnRoad, false,
 			http.HandlerFunc(s.handleOnRoadList))))
+	mux.Handle("GET /api/onroad/{id}",
+		s.requireAuth(s.requirePermission(auth.PermOnRoad, false,
+			http.HandlerFunc(s.handleOnRoadGet))))
+
+	// Writes need 读写. The distinction is enforced here, not in the UI: a
+	// read-only user's browser can still issue a POST.
+	mux.Handle("POST /api/onroad",
+		s.requireAuth(s.requirePermission(auth.PermOnRoad, true,
+			http.HandlerFunc(s.handleOnRoadCreate))))
+	mux.Handle("PATCH /api/onroad/{id}",
+		s.requireAuth(s.requirePermission(auth.PermOnRoad, true,
+			http.HandlerFunc(s.handleOnRoadUpdate))))
 }

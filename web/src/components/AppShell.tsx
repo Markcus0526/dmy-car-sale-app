@@ -6,6 +6,7 @@ import type { MenuNode, MeResponse } from "../api/client";
 import LanguageSwitcher from "./LanguageSwitcher";
 import PlaceholderPage from "../pages/PlaceholderPage";
 import OnRoadPage from "../pages/OnRoadPage";
+import { PermissionProvider } from "../state/permissions";
 
 /** Flatten the tree to the leaves that own a route. */
 function leaves(nodes: MenuNode[]): MenuNode[] {
@@ -65,6 +66,7 @@ export default function AppShell({ me, onLogout }: AppShellProps) {
   const first = routes[0];
 
   return (
+    <PermissionProvider permissions={me.permissions}>
     <div className="shell">
       <aside className="shell__sidebar">
         <div className="shell__brand">
@@ -121,5 +123,6 @@ export default function AppShell({ me, onLogout }: AppShellProps) {
         </main>
       </div>
     </div>
+    </PermissionProvider>
   );
 }

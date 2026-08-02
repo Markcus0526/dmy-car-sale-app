@@ -363,3 +363,111 @@ body {
   color: #8a5300;
   font-size: 13px;
 }
+
+/* --- Modal and forms (slice 4) ------------------------------------------- */
+
+.page__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.modal__backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 48px 16px;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.modal {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.3);
+  width: 100%;
+  max-width: 760px;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+}
+
+.modal__title { margin: 0; font-size: 17px; }
+
+.modal__close {
+  border: 0;
+  background: none;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  color: #64748b;
+  padding: 0 4px;
+}
+.modal__close:disabled { cursor: default; opacity: 0.4; }
+
+.modal__body { padding: 20px; }
+
+.modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border, #e2e8f0);
+}
+
+/*
+ * auto-fill, not auto-fit: with auto-fit a form holding one or two fields
+ * stretches them across the whole dialog, which looks broken. Columns stay
+ * a consistent width regardless of how many fields a screen has -- and the
+ * ~25 screens this template serves vary a lot.
+ */
+.form__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px 16px;
+}
+
+.field { display: flex; flex-direction: column; gap: 4px; }
+
+.field__label { font-size: 13px; color: #475569; }
+.field__required { color: #dc2626; }
+
+.field__input {
+  border: 1px solid var(--border, #cbd5e1);
+  border-radius: 4px;
+  padding: 7px 9px;
+  font: inherit;
+  min-width: 0; /* grid items refuse to shrink below content width without this */
+}
+.field__input:disabled { background: #f1f5f9; }
+
+.field__input--numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.field--invalid .field__input { border-color: #dc2626; }
+
+.field__error { margin: 0; font-size: 12px; color: #dc2626; }
+
+.alert--warn {
+  background: #fffbeb;
+  border-color: #f59e0b;
+  color: #92400e;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.alert--warn p { margin: 0; }
