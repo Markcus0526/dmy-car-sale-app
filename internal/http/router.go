@@ -14,6 +14,7 @@ import (
 	"github.com/Markcus0526/carsaleman/internal/auth"
 	"github.com/Markcus0526/carsaleman/internal/http/apierr"
 	"github.com/Markcus0526/carsaleman/internal/platform/config"
+	storemysql "github.com/Markcus0526/carsaleman/internal/store/mysql"
 )
 
 type Server struct {
@@ -21,14 +22,21 @@ type Server struct {
 	log      *slog.Logger
 	auth     *auth.Service
 	sessions *auth.SessionService
+	onroad   *storemysql.OnRoadRepo
 }
 
 // NewServer wires the HTTP layer.
 //
 // auth and sessions may be nil in tests that only exercise unauthenticated
 // routes; every handler that needs them sits behind requireAuth.
-func NewServer(cfg config.Config, log *slog.Logger, authSvc *auth.Service, sessions *auth.SessionService) *Server {
-	return &Server{cfg: cfg, log: log, auth: authSvc, sessions: sessions}
+func NewServer(
+	cfg config.Config,
+	log *slog.Logger,
+	authSvc *auth.Service,
+	sessions *auth.SessionService,
+	onroad *storemysql.OnRoadRepo,
+) *Server {
+	return &Server{cfg: cfg, log: log, auth: authSvc, sessions: sessions, onroad: onroad}
 }
 
 // Handler returns the fully wired root handler.
@@ -44,6 +52,8 @@ func (s *Server) Handler() http.Handler {
 	// Authenticated. Every route beyond this point carries a real session;
 	// nav gating on the client is convenience, this is the boundary (§10.8).
 	mux.Handle("GET /api/auth/me", s.requireAuth(http.HandlerFunc(s.handleMe)))
+
+	s.registerOnRoad(mux)
 
 	// Catch-all. Without it, unmatched routes fall through to the stdlib's
 	// "404 page not found" plaintext, the client's JSON parse fails, and every

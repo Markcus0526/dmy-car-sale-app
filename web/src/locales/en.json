@@ -2,7 +2,6 @@
   "app.name": "Liaoning Zhongzhicheng Vehicle Sales & Inventory System",
   "app.shortName": "CarSaleMan",
   "app.tagline": "Vehicle Inventory & Sales Management",
-
   "common.loading": "Loading…",
   "common.save": "Save",
   "common.cancel": "Cancel",
@@ -19,14 +18,12 @@
   "common.language": "Language",
   "common.signOut": "Sign out",
   "common.retry": "Retry",
-
   "login.title": "Sign in",
   "login.code": "Code",
   "login.username": "Name",
   "login.password": "Password",
   "login.submit": "Sign in",
   "login.submitting": "Signing in…",
-
   "menu.movement": "Vehicle Movement",
   "menu.movement.onroad": "On-Road / Uncollected Vehicles",
   "menu.movement.storein": "Store In",
@@ -35,7 +32,6 @@
   "menu.movement.speccar": "Special Vehicles",
   "menu.movement.repair": "Complimentary Fit-Out",
   "menu.movement.journal": "Service Journal",
-
   "menu.statistics": "Query & Statistics",
   "menu.statistics.searchOnroad": "On-Road Query",
   "menu.statistics.searchStorein": "Inventory Query",
@@ -48,7 +44,6 @@
   "menu.statistics.remainAmount": "Stock Volume & Capital Ratio by Car Type",
   "menu.statistics.annualBonus": "Annual Sales Bonus",
   "menu.statistics.saleCarType": "Sales by Car Type",
-
   "menu.reports": "Reports",
   "menu.reports.storeDetail": "Arrivals Detail",
   "menu.reports.storeTypeDetail": "Distribution Detail",
@@ -61,17 +56,14 @@
   "menu.reports.saleCountTotal": "Sales Volume Summary",
   "menu.reports.wholeSaleTotal": "Wholesale & Retail Summary",
   "menu.reports.carSeriesTotal": "Purchase / Sales / Inventory Summary",
-
   "menu.charts": "Charts",
   "menu.charts.buyTotal": "Overall Purchase, Sales & Inventory",
   "menu.charts.saleKind": "Volume by Sales Method",
   "menu.charts.saleCount": "Sales Consultant Ranking",
   "menu.charts.saleRegion": "Sales by Region",
   "menu.charts.custJob": "Sales by Industry",
-
   "menu.finance": "Finance",
   "menu.finance.store": "Finance Summary",
-
   "menu.settings": "Settings",
   "menu.settings.carType": "Car Type & Pricing",
   "menu.settings.baseData": "Reference Data",
@@ -79,14 +71,11 @@
   "menu.settings.userPermission": "User Permissions",
   "menu.settings.dbBackup": "Database Backup",
   "menu.settings.financeParam": "Finance Parameters",
-
   "menu.passChange": "Change Password",
-
   "nav.notImplemented": "Not built yet",
   "nav.notImplementedBody": "This screen arrives in a later slice. The navigation, permission gating and language switching around it are already live.",
   "nav.permissionKey": "Permission key",
   "nav.signedInAs": "Signed in as",
-
   "error.BAD_REQUEST": "The request could not be understood.",
   "error.UNAUTHORIZED": "Please sign in to continue.",
   "error.FORBIDDEN": "You do not have permission to do that.",
@@ -99,5 +88,27 @@
   "error.UNKNOWN": "An unexpected error occurred.",
   "error.field.REQUIRED": "Required",
   "error.field.TOO_LONG": "Too long",
-  "error.field.INVALID_FORMAT": "Invalid format"
+  "error.field.INVALID_FORMAT": "Invalid format",
+  "filter.field": "Field",
+  "filter.operator": "Condition",
+  "filter.value": "Value",
+  "filter.remove": "Remove condition",
+  "filter.addCondition": "+ Add condition",
+  "filter.allMustMatch": "All conditions must match.",
+  "filter.op.contains": "contains",
+  "filter.op.eq": "is",
+  "filter.op.gte": "on or after",
+  "filter.op.lte": "on or before",
+  "grid.empty": "No matching records.",
+  "grid.rowCount": "{{count}} rows",
+  "onroad.col.vin": "VIN",
+  "onroad.col.engineno": "Engine No.",
+  "onroad.col.billno": "Original B/L No.",
+  "onroad.col.billdate": "Bill Date",
+  "onroad.col.carname": "Vehicle Name",
+  "onroad.col.carseries": "Car Series",
+  "onroad.col.colorname": "Colour",
+  "onroad.col.carstate": "Status",
+  "onroad.col.inprice": "Cost Price",
+  "grid.truncated": "Showing the first results only. Narrow your search to see the rest."
 }

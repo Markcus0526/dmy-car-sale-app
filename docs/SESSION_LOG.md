@@ -10,14 +10,14 @@ Newest entry first.
 
 ## Where things stand
 
-*Updated end of Day 12. Read this first; the entries below are the detail.*
+*Updated end of Day 18 (one week). Read this first; the entries below are the detail.*
 
 | | |
 |---|---|
 | **Phase** | Phase 1 (foundation) in progress. **Phase 0 not yet run** |
-| **Sessions logged** | 13 (Day 0–12) |
-| **Plan** | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — 161 sessions, 17 locked decisions |
-| **Next action** | Slice 1 is functionally complete. Next is slice 2 (reference data) or slice 3 (shared filter+grid, which gates 4–8). **Phase 1 proper is blocked on Phase 0** |
+| **Sessions logged** | 19 (Day 0–18) |
+| **Plan** | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — **158** sessions, **18** locked decisions |
+| **Next action** | Slice 4 continues: on-road create/edit modal, then Excel import (needs Q3 answered). **Phase 1 proper is blocked on Phase 0** |
 
 **Green — verified and repeatable**
 
@@ -46,6 +46,12 @@ Newest entry first.
 - **Working end-to-end login** — `POST /api/auth/login` → HttpOnly cookie → `GET /api/auth/me`
   → menu filtered by real permissions. `POST /api/auth/logout` revokes server-side.
 - 49 permission keys match legacy `FrmMDIMain` exactly.
+- **`internal/query`** — parameterised filter builder replacing `FrmSearch`; 16 tests,
+  LIKE escaping verified against real MySQL.
+- **Reusable `DataGrid` + `FilterBar`** (TanStack headless, D5) — one grid for every list
+  screen, replacing eleven copy-pasted filter blocks.
+- **First real list screen**: on-road vehicles, filter → SQL → grid, permission-gated.
+  9 integration tests including literal `%`, Chinese filtering, inclusive date bounds.
 - **`./scripts/check.sh`** — every check in one command; `--db` adds the MySQL migration and
   integration checks. **No CI**: GitHub Actions was removed by request, so nothing runs
   automatically. Run this before committing.
@@ -102,6 +108,180 @@ Newest entry first.
 **Next action**
 -
 ```
+
+---
+
+## Days 14–18 — 2026-08-02 — Slice 3 complete, slice 4 begun (one week)
+
+**Plan reconciled first — it had drifted in three places**
+
+| Drift | Reality |
+|---|---|
+| §12 Progress said everything "Not started" | 14 sessions of work had happened |
+| §1.1 mandated `tbl_i18n` + `tbl_userinfo.locale` | Database i18n was **scoped out**. Slice 2 was budgeting **3 sessions for a translation admin screen we agreed not to build** |
+| Day 4/5 said "1,156 literals", "`.resx` hold no strings" | Measured: **1,447** literals, and `.resx` holds **144 grid captions** |
+
+The i18n one mattered: recorded as **D18**, total drops **161 → 158 sessions**. A plan that
+contradicts an agreed decision is worse than no plan, because it gets followed.
+
+**Built**
+
+- `DataGrid` (TanStack headless, D5) + `FilterBar` — the one grid and one filter for every
+  list screen, replacing eleven copy-pasted blocks.
+- `migrations/0005_vw_onroad` — reconstructed from the §3 column contract.
+- `OnRoadRepo` with a `query.Fields` allowlist, `MaxListRows` bound, decimal-as-string.
+- `POST /api/onroad/list`, permission-gated on `在途/未提车辆管理`.
+- The on-road screen: filter → SQL → grid, both locales.
+
+**Verified**
+
+```
+./scripts/check.sh --db          ALL PASS
+  16 base tables + 1 view, full rollback 0, re-apply 17
+  schema behaviour               5 assertions
+  store integration              21 tests
+on-road integration              9/9
+```
+
+**`vw_onroad`: the one thing I could not know, and what I did about it**
+
+The column contract gives the shape exactly — `tbl_onroad` plus `carseries` — but not
+whether the original used INNER or LEFT JOIN. That is not cosmetic:
+
+- **INNER** — a vehicle with an orphaned `cartypeid` **vanishes** from every screen and
+  report built on the view.
+- **LEFT** — it appears with a null `carseries`.
+
+Chose LEFT. If the original was INNER, this shows extra rows, which is visible and
+reportable; the other way round loses rows silently, and silent row loss in a financial
+system is the worse failure by a wide margin. `TODO(phase0)` on the migration.
+
+**A refinement the FK forced.** Seeding an orphan failed — 0002's foreign key correctly
+refuses one. Which clarifies the scope: **once the FK exists, INNER and LEFT are
+equivalent.** The choice only matters for legacy data loaded *before* the constraint — which
+is exactly the data this port migrates, and exactly why §5.3 orders load → verify →
+constrain. The test now sets `FOREIGN_KEY_CHECKS = 0` to reproduce that window rather than
+pretending it cannot happen.
+
+**Finding for `cmd/migrate-data`: 107 columns are NOT NULL with no DEFAULT**
+
+Hit while seeding — `tbl_cartype` alone needs 16 values. Every one must be supplied on
+insert, and the inferred schema cannot say what the source defaults were. That makes the
+`TODO(phase0): confirm COLUMN_DEFAULT` marker (export step 4) considerably more
+consequential than it reads: without it, `migrate-data` either fails on every row or invents
+values.
+
+**Design points**
+
+- **`POST /api/onroad/list`, not `GET`.** The filter is a structured object; encoding it into
+  a query string means inventing a serialisation and parsing it back — precisely the
+  string-munging §2.6 exists to remove. Still a read, still gated on read permission.
+- **`MaxListRows = 500`, and truncation is reported.** The legacy pulled whole tables into a
+  client-side DataSet (§2.4). A silently capped list reads as "there are only this many",
+  which is how people draw wrong conclusions from a screen.
+- **`ORDER BY uid`, not `carseries`.** Chinese display order is applied in Go (D16);
+  `utf8mb4_unicode_ci` does not reproduce `Chinese_PRC_CI_AS`.
+- **Table/view counts in `check.sh` are now separated.** `information_schema.tables` counts
+  both, so a bare `COUNT(*)` silently changes meaning every time a view is added.
+
+**Half-finished**
+
+- On-road is read-only: no create/edit modal yet.
+- Excel import (§11.6) is untouched and needs **Q3** answered.
+- `vw_storein` / `vw_storeout` / `vw_speccar` / `vw_department` not built — their contracts
+  are known but the joins are less obvious than `vw_onroad`'s, so they wait for the dump.
+
+**Blocked**
+
+- **Phase 0 day 1** — export against `csm` on `R-SEVEN64`. Nineteen sessions.
+
+**Next action**
+
+On-road create/edit modal over the shared grid, establishing the modal pattern for the ~25
+`*Add`/`*Edit` screens.
+
+---
+
+## Day 13 — 2026-08-01 — Shared query filter (slice 3, §2.6)
+
+Slice 3 gates slices 4–8, so it is the highest-leverage remaining work.
+
+**What the legacy actually does — worth reading the code for**
+
+`FrmSearch` was not a general expression builder. The user picks up to three text
+columns and one date column **by clicking grid headers**, and the column's underlying
+name lands in `keyField1..4` — 52 assignments across 11 forms, every one of the shape
+`frmSearch.keyField1 = grid.Cols[c].Name`. It then concatenates:
+
+```
+keyField1 LIKE '%typed%' AND keyField2 LIKE '%typed%' AND …
+AND keyField4 >= 'start' AND keyField4 <= 'end'
+```
+
+That block is **copy-pasted eleven times**, once per `searchKind`, differing only in which
+form it calls back into.
+
+**Why that shape matters for security**
+
+The field name comes from the client and **a column name cannot be a bind parameter**. So
+it is the one part of a filter that must be *validated*, not escaped. `query.Fields` is a
+per-resource allowlist mapping API field name → SQL column; anything not in it is rejected.
+The indirection also keeps internal names internal — `vw_storeout.Expr1` is exactly the
+sort of thing that should never be nameable from outside.
+
+Values are always bound. §10.6 notes the legacy targeted `DataTable.Select` rather than the
+database, so it was expression injection rather than SQL injection — but the port issues
+real SQL, where the same shape is not survivable.
+
+**Two deliberate departures from legacy behaviour**
+
+1. **LIKE metacharacters are escaped.** The legacy interpolated raw input into `'%value%'`,
+   so a user typing `%` silently matched everything and `_` matched any character. Nobody
+   could have been relying on that — it is neither documented nor discoverable — and a
+   search box is understood to match literal text.
+
+   Verified against MySQL rather than assumed:
+   `LIKE '%a\_b%' ESCAPE '\\'` matches `a_b` but not `axb`; unescaped `LIKE '%a_b%'`
+   matches both.
+
+2. **An inclusive date upper bound covers the whole day.** `<= '2026-08-01'` against a
+   `DATETIME` otherwise excludes everything after midnight — the classic off-by-a-day that
+   in a sales report is a wrong *number*, not a wrong screen. Dates parse in
+   `Asia/Shanghai` for the same reason the driver does.
+
+**Verified**
+
+```
+go test -race ./internal/query/   16/16
+LIKE escaping                     confirmed against MySQL 8.4, with a control
+./scripts/check.sh                ALL PASS
+```
+
+**Three test bugs of my own, all the same shape**
+
+Each time the code was right and the assertion was wrong:
+
+- asserted the SQL contained no `'`, but `ESCAPE '\'` is *ours*;
+- asserted the bound arg equalled the raw input, but it is correctly LIKE-escaped.
+
+Both were me testing the implementation's incidentals rather than the property I cared
+about. The fixed versions state the property: no fragment of the user's value appears in
+the SQL text, and exactly one placeholder is emitted.
+
+**Half-finished**
+
+- No repository uses `query.Build` yet — the first will be slice 4 (on-road vehicles).
+- No `Fields` allowlists are declared yet; each belongs next to the repository that owns it.
+- The React grid and filter UI do not exist. That is the rest of slice 3.
+
+**Blocked**
+
+- **Phase 0 day 1** — export against `csm` on `R-SEVEN64`.
+
+**Next action**
+
+Build the reusable React data grid with the filter UI on top of `internal/query`'s shape,
+then wire the first list endpoint through it.
 
 ---
 
