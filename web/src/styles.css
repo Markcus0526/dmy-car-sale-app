@@ -677,3 +677,27 @@ body {
   color: #334155;
   font-size: 13px;
 }
+
+/* --- Editable quarterly grid (§6.3) -------------------------------------- */
+
+.grid__cell--numeric { text-align: end; font-variant-numeric: tabular-nums; }
+
+/* Computed cells are visibly not yours to type in — the original made the
+   subtotal and percent rows read-only and styled them apart. */
+.grid__cell--computed { background: #f8fafc; color: #475569; }
+
+.grid__input {
+  width: 6.5em;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 3px 5px;
+  font: inherit;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  background: transparent;
+}
+.grid__input:hover { border-color: var(--border, #cbd5e1); }
+.grid__input:focus { border-color: #2563eb; background: #fff; outline: none; }
+
+.grid__row--subtotal { background: #f1f5f9; font-weight: 600; }
+.grid__row--subtotal th { text-align: start; }

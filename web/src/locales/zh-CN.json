@@ -221,5 +221,19 @@
   "storeout.kind": "销售方式",
   "storeout.region": "销售区域",
   "storeout.carno": "车牌号",
-  "storeout.outprice": "售价"
+  "storeout.outprice": "售价",
+  "quarter.year": "年度",
+  "quarter.quarter": "季度",
+  "quarter.q": "第 {{n}} 季度",
+  "quarter.general": "普通车型",
+  "quarter.special": "特种车型",
+  "quarter.target": "季度任务",
+  "quarter.month": "{{n}} 月",
+  "quarter.achieved": "完成数",
+  "quarter.remain": "库存",
+  "quarter.percent": "完成率",
+  "quarter.subtotal": "合计",
+  "quarter.noSeries": "此年度暂无车系列数据。",
+  "quarter.unsaved": "有未保存的修改。",
+  "quarter.discardConfirm": "有未保存的修改，切换后将丢失。是否继续？"
 }

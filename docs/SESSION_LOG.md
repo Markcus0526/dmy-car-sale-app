@@ -10,14 +10,14 @@ Newest entry first.
 
 ## Where things stand
 
-*Updated end of Day 34. Read this first; the entries below are the detail.*
+*Updated end of Day 39. Read this first; the entries below are the detail.*
 
 | | |
 |---|---|
 | **Phase** | Phase 1 (foundation) in progress. **Phase 0 not yet run** |
-| **Sessions logged** | 35 (Day 0–34) |
+| **Sessions logged** | 40 (Day 0–39) |
 | **Plan** | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — **158** sessions, **18** locked decisions. Q4 and Q5 answered; **Q10 opened** |
-| **Next action** | Slice 8's remaining screens (speccar, 赠送装修) and the quarterly-target grid (§6.3). Then the runway is spent. Decide **Q10**. **Phase 1 proper is blocked on Phase 0** |
+| **Next action** | Slice 8's remaining screens (特种车统计表, 赠送装修) — the last unblocked work, ~4 sessions. Then the runway is **spent** and everything left needs Phase 0. Decide **Q10** |
 
 **Green — verified and repeatable**
 
@@ -108,6 +108,76 @@ Newest entry first.
 **Next action**
 -
 ```
+
+---
+
+## Days 35–39 — 2026-08-02 — Quarterly targets (§6.3)
+
+**Done**
+
+`internal/domain/quarterstats` (pure arithmetic), the repository, GET + whole-
+quarter PUT, and the editable dual-block grid.
+
+**The finding: .NET and Go round differently, and it shows up here**
+
+`String.Format("{0:0.00}%", per)` formats a .NET `decimal` by rounding **half
+away from zero**. Go's `fmt "%.2f"` rounds **half to even**, on a float64 whose
+binary value may already sit just below the midpoint.
+
+    1/160 = 0.625%   .NET "0.63%"   Go %.2f "0.62%"
+
+That is a last-digit disagreement nobody could explain during report
+equivalence testing. `FormatPercent` computes in integers and rounds
+explicitly. Verified empirically, not assumed — the test asserts Go's own
+formatter *disagrees*, so if Go ever changes, the test fails and says why.
+
+**Also ported faithfully**
+
+- The subtotal percentage divides `(a2+a3+a4)` by `a1`, **not** `a5` by `a1`.
+  They are equal only because col5 is recomputed in the same loop before a5
+  accumulates it. Reproduced as written so the equivalence is provable.
+- A zero target yields the literal `"0.00%"` — the original guards it
+  explicitly and the reports depend on the string.
+- Grid row 7 is always `"0"`: the legacy loader writes the literal and never
+  reads it from the database. Carried as `Row.Extra` so it is explicit rather
+  than a mystery column.
+
+**Where I did not follow the original**
+
+The legacy general-block query has **no `type` predicate at all** (line 176)
+while the special block filters `type = 1` (line 206). Reproduced as "not
+special" rather than "no filter", because the literal original would let a
+special series' row satisfy the general query and appear in *both* blocks. In
+practice the two blocks draw from different lists so they never overlap — but
+that is a coincidence, not a guarantee. `TODO(phase0)` records what to count.
+
+**Save is a whole-quarter PUT**, per §6.3. One `tbl_quarterstats` row carries
+all twelve months and all four quarters, so `TestSavingOneQuarterLeavesTheOthersAlone`
+is the load-bearing test: editing Q3 must not disturb Q1, Q2, Q4 or the other
+nine months. The legacy form saved on year/quarter switch, which §6.3 names as
+where it is most likely to lose edits.
+
+**New guard: screen routes**
+
+`tools/check-routes/check.mjs`. I wired the quarterly screen as `quarterTarget`
+when the menu id is `quarter-target`. That fails **nothing** — no build error,
+no typecheck error, no runtime throw. The condition never matches and the route
+silently renders `PlaceholderPage`, so the screen just looks unbuilt.
+
+The guard also refuses to pass vacuously: if either regex stops matching it
+fails rather than reporting success over zero ids. Negative control validated —
+reintroducing the typo exits 1 and names it.
+
+**Verified**
+
+`./scripts/check.sh --db` → **ALL CHECKS PASS**. 8 domain tests, 6 repository
+tests against real MySQL, 5 handler tests. Catalogues at **237** keys, parity
+holds.
+
+**Runway status**
+
+Slice 8's 特种车统计表 and 赠送装修 are the last unblocked screens — roughly 4
+sessions. After that everything remaining needs the Phase 0 export.
 
 ---
 

@@ -10,6 +10,7 @@ import BaseDataPage from "../pages/BaseDataPage";
 import JournalPage from "../pages/JournalPage";
 import StoreInPage from "../pages/StoreInPage";
 import StoreOutPage from "../pages/StoreOutPage";
+import QuarterTargetPage from "../pages/QuarterTargetPage";
 import { PermissionProvider } from "../state/permissions";
 
 /** Flatten the tree to the leaves that own a route. */
@@ -119,6 +120,8 @@ export default function AppShell({ me, onLogout }: AppShellProps) {
                     <StoreInPage />
                   ) : node.id === "storeout" ? (
                     <StoreOutPage />
+                  ) : node.id === "quarter-target" ? (
+                    <QuarterTargetPage />
                   ) : (
                     <PlaceholderPage
                       labelKey={node.labelKey}

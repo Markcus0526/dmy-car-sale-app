@@ -63,6 +63,11 @@ step "encoding lossless"   node tools/convert-encoding/convert.mjs --check
 step "app catalogue"       node tools/extract-strings/verify.mjs web/src/locales/zh-CN.json web/src/locales/en.json
 step "extracted catalogue" node tools/extract-strings/verify.mjs docs/i18n/zh-CN.extracted.json docs/i18n/en.extracted.json
 
+# A wired screen id that does not exist in menu.go fails silently: the
+# condition never matches and the route renders PlaceholderPage, so the screen
+# just looks unbuilt. Nothing else catches it.
+step "screen routes wired"  node tools/check-routes/check.mjs
+
 # A diff means either the legacy source changed or someone hand-edited
 # generated output. Both need a human.
 node tools/extract-strings/extract.mjs >/dev/null 2>&1

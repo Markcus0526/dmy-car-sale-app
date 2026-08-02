@@ -221,5 +221,19 @@
   "storeout.kind": "Sales Method",
   "storeout.region": "Sales Region",
   "storeout.carno": "Plate No.",
-  "storeout.outprice": "Sale Price"
+  "storeout.outprice": "Sale Price",
+  "quarter.year": "Year",
+  "quarter.quarter": "Quarter",
+  "quarter.q": "Q{{n}}",
+  "quarter.general": "General Car Types",
+  "quarter.special": "Special Car Types",
+  "quarter.target": "Target",
+  "quarter.month": "Month {{n}}",
+  "quarter.achieved": "Achieved",
+  "quarter.remain": "Stock",
+  "quarter.percent": "Achievement",
+  "quarter.subtotal": "Total",
+  "quarter.noSeries": "No car series recorded for this year.",
+  "quarter.unsaved": "You have unsaved changes.",
+  "quarter.discardConfirm": "You have unsaved changes; switching will discard them. Continue?"
 }
