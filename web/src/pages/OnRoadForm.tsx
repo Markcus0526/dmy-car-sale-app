@@ -9,6 +9,7 @@ import {
   updateOnRoad,
   type OnRoadForm as FormValues,
 } from "../api/client";
+import CarTypePicker from "../components/CarTypePicker";
 import FormField from "../components/FormField";
 import Modal from "../components/Modal";
 
@@ -226,27 +227,30 @@ export default function OnRoadFormModal({ uid, onClose, onSaved }: Props) {
               required
             />
             {/*
-              A raw cartypeid box is a stopgap. This becomes a picker once
-              slice 2 lands tbl_cartype, which is also what supplies carseries
-              and the default cost price. Flagged rather than hidden: typing a
-              foreign key by hand is not a shippable interaction.
+              The picker replaces the raw id box slice 4 shipped. Selecting a
+              type fills carname, the interior fields and the cost price from
+              tbl_cartype — which is what the legacy FrmOnRoadAdd did, and the
+              reason those columns are denormalised onto tbl_onroad at all.
+
+              Only BLANK fields are filled. Overwriting a value the user
+              already typed, or one loaded from an existing record, would
+              silently discard it — and on inprice that is a money field.
             */}
-            <FormField
-              name="cartypeid"
-              labelKey="onroad.col.cartypeid"
-              type="number"
-              value={values.cartypeid ? String(values.cartypeid) : ""}
-              onChange={set("cartypeid")}
-              errorCode={fieldErrors.cartypeid}
-              required
-            />
-            <FormField
-              name="cartype"
-              labelKey="onroad.col.cartype"
-              value={values.cartype}
-              onChange={set("cartype")}
-              errorCode={fieldErrors.cartype}
-              required
+            <CarTypePicker
+              value={values.cartypeid}
+              errorCode={fieldErrors.cartypeid ?? fieldErrors.cartype}
+              onChange={(uid, ct) =>
+                setValues((v) => ({
+                  ...v,
+                  cartypeid: uid,
+                  cartype: ct?.carcode ?? v.cartype,
+                  carname: v.carname || (ct?.carname ?? ""),
+                  subsets: v.subsets || (ct?.subsets ?? ""),
+                  insidesetcode: v.insidesetcode || (ct?.insidesetcode ?? ""),
+                  insidesetname: v.insidesetname || (ct?.insidesetname ?? ""),
+                  inprice: v.inprice || (ct?.inprice ?? ""),
+                }))
+              }
             />
             <FormField
               name="carname"

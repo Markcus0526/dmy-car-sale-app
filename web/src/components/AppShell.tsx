@@ -6,6 +6,8 @@ import type { MenuNode, MeResponse } from "../api/client";
 import LanguageSwitcher from "./LanguageSwitcher";
 import PlaceholderPage from "../pages/PlaceholderPage";
 import OnRoadPage from "../pages/OnRoadPage";
+import BaseDataPage from "../pages/BaseDataPage";
+import JournalPage from "../pages/JournalPage";
 import { PermissionProvider } from "../state/permissions";
 
 /** Flatten the tree to the leaves that own a route. */
@@ -107,6 +109,10 @@ export default function AppShell({ me, onLogout }: AppShellProps) {
                   // the placeholder so nav stays complete and honest.
                   node.id === "onroad" ? (
                     <OnRoadPage />
+                  ) : node.id === "basedata" ? (
+                    <BaseDataPage />
+                  ) : node.id === "journal" ? (
+                    <JournalPage />
                   ) : (
                     <PlaceholderPage
                       labelKey={node.labelKey}

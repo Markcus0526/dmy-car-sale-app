@@ -15,7 +15,7 @@ func testServer() http.Handler {
 	return NewServer(
 		config.Config{Env: "dev", CORSOrigins: []string{"http://localhost:5173"}},
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
-		nil, nil, nil,
+		nil, Deps{},
 	).Handler()
 }
 

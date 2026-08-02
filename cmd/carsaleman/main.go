@@ -42,6 +42,9 @@ func run() error {
 		authSvc  *auth.Service
 		sessions *auth.SessionService
 		onroad   *storemysql.OnRoadRepo
+		basedata *storemysql.BaseDataRepo
+		cartype  *storemysql.CarTypeRepo
+		journal  *storemysql.JournalRepo
 	)
 	if cfg.MySQLDSN != "" {
 		dbCtx, cancelDB := context.WithTimeout(context.Background(), 15*time.Second)
@@ -55,14 +58,20 @@ func run() error {
 		authSvc = auth.NewService(storemysql.NewUserRepo(db), log)
 		sessions = auth.NewSessionService(storemysql.NewSessionRepo(db))
 		onroad = storemysql.NewOnRoadRepo(db)
+		basedata = storemysql.NewBaseDataRepo(db)
+		cartype = storemysql.NewCarTypeRepo(db)
+		journal = storemysql.NewJournalRepo(db)
 		log.Info("database connected")
 	} else {
 		log.Warn("no CARSALEMAN_MYSQL_DSN: authenticated routes are unavailable")
 	}
 
 	srv := &http.Server{
-		Addr:              cfg.Addr,
-		Handler:           apphttp.NewServer(cfg, log, authSvc, sessions, onroad).Handler(),
+		Addr: cfg.Addr,
+		Handler: apphttp.NewServer(cfg, log, authSvc, apphttp.Deps{
+			Sessions: sessions, OnRoad: onroad, BaseData: basedata,
+			CarType: cartype, Journal: journal,
+		}).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

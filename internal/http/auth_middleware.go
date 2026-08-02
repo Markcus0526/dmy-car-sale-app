@@ -38,7 +38,7 @@ func (s *Server) requireAuth(next http.Handler) http.Handler {
 		// Without a database there is no way to authenticate anyone. Say so
 		// explicitly: dereferencing a nil service would panic into a generic
 		// 500 and look like a bug rather than a missing DSN.
-		if s.sessions == nil || s.auth == nil {
+		if s.Sessions == nil || s.auth == nil {
 			s.log.Error("authenticated route reached with no database configured",
 				"path", r.URL.Path, "request_id", reqID)
 			apierr.Write(w, apierr.CodeUnavailable, reqID, nil)
@@ -51,7 +51,7 @@ func (s *Server) requireAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		userID, err := s.sessions.Validate(r.Context(), c.Value)
+		userID, err := s.Sessions.Validate(r.Context(), c.Value)
 		if err != nil {
 			if errors.Is(err, auth.ErrSessionInvalid) {
 				// The cookie is dead; clear it so the browser stops sending it.

@@ -18,25 +18,33 @@ import (
 )
 
 type Server struct {
-	cfg      config.Config
-	log      *slog.Logger
-	auth     *auth.Service
-	sessions *auth.SessionService
-	onroad   *storemysql.OnRoadRepo
+	cfg  config.Config
+	log  *slog.Logger
+	auth *auth.Service
+	Deps
+}
+
+// Deps are the repositories and services the handlers reach for.
+//
+// A struct rather than positional arguments: this list grows by one with every
+// slice, and seven positional parameters -- most of them nil in tests -- is a
+// shape where transposing two of the same type compiles and silently wires the
+// wrong repository to the wrong handler.
+//
+// Every field may be nil. Handlers that need one check it and answer
+// SERVICE_UNAVAILABLE, so the server still starts with no database and reports
+// a misconfiguration as a misconfiguration rather than a crash.
+type Deps struct {
+	Sessions *auth.SessionService
+	OnRoad   *storemysql.OnRoadRepo
+	BaseData *storemysql.BaseDataRepo
+	CarType  *storemysql.CarTypeRepo
+	Journal  *storemysql.JournalRepo
 }
 
 // NewServer wires the HTTP layer.
-//
-// auth and sessions may be nil in tests that only exercise unauthenticated
-// routes; every handler that needs them sits behind requireAuth.
-func NewServer(
-	cfg config.Config,
-	log *slog.Logger,
-	authSvc *auth.Service,
-	sessions *auth.SessionService,
-	onroad *storemysql.OnRoadRepo,
-) *Server {
-	return &Server{cfg: cfg, log: log, auth: authSvc, sessions: sessions, onroad: onroad}
+func NewServer(cfg config.Config, log *slog.Logger, authSvc *auth.Service, deps Deps) *Server {
+	return &Server{cfg: cfg, log: log, auth: authSvc, Deps: deps}
 }
 
 // Handler returns the fully wired root handler.
@@ -54,6 +62,9 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /api/auth/me", s.requireAuth(http.HandlerFunc(s.handleMe)))
 
 	s.registerOnRoad(mux)
+	s.registerBaseData(mux)
+	s.registerCarType(mux)
+	s.registerJournal(mux)
 
 	// Catch-all. Without it, unmatched routes fall through to the stdlib's
 	// "404 page not found" plaintext, the client's JSON parse fails, and every
